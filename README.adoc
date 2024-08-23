@@ -1,9 +1,214 @@
 = acme-dns-client-2
+:author: Matthias "Maddes" Bücher
+:url-maddes: https://www.maddes.net/
+:toc:
 
-== TODO
 
-* One configuration for all usages
-* Configuration holds all details to reduce command line parameters
-* Scripts only (Python 3.5+; with sh shell wrapper for Virtual Environment)
-* Support certbot
-* Support acme.sh
+== Features
+
+* Manage acme-dns domain registrations and txt record updates with ease
+* Supports https://certbot.eff.org/[certbot]
+* Supports https://github.com/acmesh-official/acme.sh[acme.sh]
+* One configuration for all: command line, certbot, acme.sh, etc.
+** Allows switching between Let's Encrypt clients (certbot, acme.sh) without reconfiguration
+* All details of each registration is kept in files to reduce command line parameters and support multiple acme-dns server instances
+* Scripts only: Python 3.5+ with sh shell wrapper for Python Virtual Environment
+////
+* Prepared for future acme-dns functionalities
+** deregister a domain
+** clean/remove a domain's token/txt record
+** change domain registration details (e.g. allowfrom)
+////
+
+
+== Installation
+
+=== Prerequisites
+
+Install Python 3 (3.5+) and Virtual Environment support via venv.
+
+Debian/Ubuntu: `apt install python3 python3-venv`
+
+=== acme-dns-client-2
+
+Download acme-dns-client-2 and extract it to a temporary directory. Or directly `git clone`` it to a temporary directory. +
+Make `install.sh` executable.
+Run it to install acme-dns-client-2 to `${PREFIX]/usr/local/bin`. `${PREFIX]` is useful for package maintainers of Linux distros. +
+It will also create an initial configuration file and initial domain accounts file in `${PREFIX]/etc/acme-dns-client`.
+```
+chmod u+x install.sh
+PREFIX='' ./install.sh
+```
+
+=== acme.sh Support
+Copy `dns_acmednsclient2.sh` to `/path/to/acme.sh/dnsapi/`.
+
+
+== Usage
+
+=== Running acme-dns-client-2
+
+Always execute `acme-dns-client-2.sh`.
+It is a wrapper shell script to create and activate the required Python Virtual Environment. +
+When executed without any arguments it will display the main help with the possible commands.
+
+==== For developers/admins
+`acme-dns-client-2.py` can be run directly but the required modules must be available either from the system or an activated Python Virtual Environment.
+That allows to debug the Python script with an IDE.
+
+=== Commands List
+
+```
+usage: acme-dns-client-2.sh [-h] [--config CONFIG] [--accounts ACCOUNTS] [--verbose] command ...
+
+options:
+  -h, --help           show this help message and exit
+  --config CONFIG      path to configuration file
+  --accounts ACCOUNTS  path to domain accounts file
+  --verbose, -v        increase verbosity
+
+commands:
+  command              Use `<command> --help` for details
+    add                add an already registered domain (to client only)
+    certbot            run as manual-auth-hook with certbot
+    check              check DNS setup of a registered domain
+    config             list configuration
+    list               list registered domains
+    register           register a domain
+    remove             remove a registered domain (from client only)
+    rename             rename a registered domain
+    show               show data for a registered domain
+    update             update challenge token of a registered domain
+    version            show program version
+```
+
+=== Configuration File
+
+The configuration file defaults to `/etc/acme-dns-client/config.json`.
+An alternative config file can be defined via `--config`.
+Maintain config file manually to define other values.
+
+See the current configuration in JSON syntax via `acme-dns-client-2.sh config`.
+If the config file is missing/empty, then the defaults are shown.
+
+The following can be configured in JSON syntax:
+
+* `default_server` (string) - defines a default server to use for `add/register` command. +
+Useful if mainly a single acme-dns server is used.
+Still another acme-dns server can be specified via `--server`.
+* `nameservers` (list of strings) - define different name servers to do DNS lookups via their IPs.
+* `accountspath` (string) - defines a different domain accounts file. Professional use only.
+
+=== Domain Accounts File
+
+The domain accounts file defaults to `/etc/acme-dns-client/domain_accounts.json`.
+An alternative domain accounts file can be defined via `--accounts` or via config file. +
+It holds all details of the registered domains in JSON syntax. +
+*DO NOT* maintain it manually.
+
+* Use command `acme-dns-client-2.sh list` to get all registered domain names.
+* Use command `acme-dns-client-2.sh show --domain <domain>` to show details for a domain.
+
+=== Register/Add Domain
+
+Register/Add each domain separately. +
+If a domain was already registered earlier and the related data is available, then use `add`.
+The password must be known as it cannot be determined from anything else.
+The fulldomain can be determined from the DNS CNAME record of the related challenge domain.
+The subdomain is part of the fulldomain.
+The username can be de determined from the acme-dns database record for the subdomain. +
+Otherwise `register` anew.
+Warning! This will lead to a new DNS setup, that will break other setups.
+
+A single registration is needed for normal and wildcard certificate entries of a domain, e.g. `test.example.com` is also valid for `*.test.example.com`.
+
+Note: `--server` can be ommited if `default_server` is defined in configuration and fits the domain registration.
+
+==== Register a new domain
+
+```
+acme-dns-client-2.sh register \
+  --domain 'test.example.com' --server 'https://acme-dns.example.net'
+```
+
+==== Add an already registered domain
+
+```
+acme-dns-client-2.sh add \
+  --domain 'test.example.com' --fulldomain 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e5.acme-auth.example.net' --username '<USERNAME>' --password '<PASSWORD>' --server 'https://acme-dns.example.net'
+```
+
+=== Check Domain Setup
+
+Use command `acme-dns-client-2.sh check --domain <domain>` to check the setup for a domain. +
+It checks the DNS CNAME record for the domain and if TXT records are delivered for it.
+
+If the setup shall be monitored during the setup procedure, then use shell command `watch -n 10 \-- acme-dns-client-2.sh ...`.
+
+=== certbot Usage
+
+Tested certbot version: 2.11.0
+
+After registration of the domains on the acme-dns server and checking their setup, request a certificate with certbot as following:
+```
+certbot certonly [--test-cert] \
+  --manual --preferred-challenges dns --manual-auth-hook '/usr/local/sbin/acme-dns-client' \
+  -d 'test.example.com' \
+  -d '*.test.example.com' \
+  ...
+```
+Afterwards no special parameters are needed:
+```
+certbot renew [---force-renewal] \
+  --cert-name 'test.example.com' \
+  ...
+```
+```
+certbot revoke \
+  --cert-name 'test.example.com' \
+  ...
+```
+https://eff-certbot.readthedocs.io/en/latest/[Certbot Documentation] -> "User Guide"
+
+=== acme.sh Usage
+
+Tested acme.sh version: 3.0.7
+
+After registration of the domains on the acme-dns server and checking their setup, request a certificate with acme.sh as following:
+```
+acme.sh --issue [--server letsencrypt_test] \
+  --domain 'test.example.com' --dns dns_acmednsclient2 \
+  --domain '*.test.example.com' --dns dns_acmednsclient2 \
+  ...
+```
+Do *NOT* define any domain alias.
+
+Afterwards no special parameters are needed:
+```
+acme.sh --renew [--server letsencrypt_test] -d 'test.example.com'
+```
+```
+acme.sh --revoke [--server letsencrypt_test] -d 'test.example.com'
+```
+https://wiki.acme.sh/[acme.sh Documentation Wiki]
+
+
+== Development & Testing
+
+=== certbot Testing
+
+Forcing execution of the manual-auth-hook script can be achieved by doing a `--dry-run` since certbot 0.40.
+```
+certbot certonly/renew --dry-run ...
+```
+
+=== acme.sh Testing
+
+Forcing execution of the DNS API script can be achieved by clearing the "valid" status of a domain at Let's Encrypt via the `--deactivate` command.
+Wildcard domains have their own status, so these have to be deactivated separately.
+```
+acme.sh --deactivate [--server letsencrypt_test] -d 'test.example.com' -d '*.test.example.com'
+```
+
+Enabling debug output can be done via `--debug 1`. Levels 2 and 3 are even more verbose. Use `--debug 2` for bug reports. +
+Warning! Using `--output-insecure` is only recommended for private tests. Do not post any output/log where this option was enabled.

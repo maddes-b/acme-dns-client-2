@@ -1,7 +1,7 @@
 ## from project: ignores for editors, etc.
 .vscode/
 .venv*/
-*.venv/
+*.venv*/
 
 ## from GitHub: Python ignore
 # Byte-compiled / optimized / DLL files
