@@ -1,0 +1,9 @@
+= acme-dns-client-2
+
+== TODO
+
+* One configuration for all usages
+* Configuration holds all details to reduce command line parameters
+* Scripts only (Python 3.5+; with sh shell wrapper for Virtual Environment)
+* Support certbot
+* Support acme.sh
