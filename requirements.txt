@@ -1,3 +1,5 @@
 # -*- coding: utf-8 -*-
+### https://docs.github.com/en/github/visualizing-repository-data-with-graphs/about-the-dependency-graph#supported-package-ecosystems
+dnspython >= 1.6
+json5
 requests >= 2.0
-dnspython >= 2.0

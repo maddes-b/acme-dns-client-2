@@ -1,5 +1,6 @@
 ## from project: ignores for editors, etc.
 .vscode/
+*.code-workspace
 .venv*/
 *.venv*/
 

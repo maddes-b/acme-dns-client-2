@@ -16,7 +16,7 @@ Authors:
 ### TODO: complete docstrings
 
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
@@ -27,7 +27,7 @@ __contact__ = __homepage__
 ### python standard modules
 import collections
 import datetime
-import json
+import json5 as json ### SPEEDUP: switch to standard 'json' module, but then avoid comments and extra commas in your configuration
 import os
 import typing
 

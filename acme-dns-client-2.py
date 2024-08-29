@@ -20,7 +20,7 @@ Authors:
 ### TODO: complete docstrings
 
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"

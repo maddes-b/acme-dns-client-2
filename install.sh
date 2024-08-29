@@ -8,7 +8,14 @@ chmod -c -- u=rwx-s,g=rx-s,o=-s "${ETCDIR}"
 chown -c -- root:root "${ETCDIR}"
 #
 ETCFILE="${ETCDIR}/config.json"
-[ -s "${ETCFILE}" ] || printf -- '{\n}\n' > "${ETCFILE}"
+if [ ! -s "${ETCFILE}" ]; then
+  if [ -s "${ETCDIR}/config.json5" ]; then
+    ### rename configuration file of <= 0.8.0 to configuration file name of 0.9.0+
+    mv -v "${ETCDIR}/config.json5" "${ETCFILE}"
+  else
+    printf -- '{\n}\n' > "${ETCFILE}"
+  fi
+fi
 chmod -c -- u=rw-s,g=r-s,o=-s "${ETCFILE}"
 chown -c -- root:root "${ETCFILE}"
 #
