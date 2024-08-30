@@ -1,5 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: nil; py-indent-offset: 4 -*-
+### shebang `/usr/bin/env python3` due to Python Virtual Environment
 
 """
 acme-dns-client-2 for acme-dns servers - normally executed via related .sh file (due to Virtual Enviroment with required modules)
@@ -20,7 +21,7 @@ Authors:
 ### TODO: complete docstrings
 
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
@@ -43,13 +44,33 @@ except KeyError as e:
 sys.path.append(os.path.dirname(sys.argv[0]))
 
 ### local modules
-import acmednsclient2
+try:
+    import acmednsclient2
+except ImportError as e:
+    text = "Execute via shell wrapper, or with a manually activated Virtual Environment that has the required modules installed"
+    if e.args:
+        e.args = ("\n".join((e.args[0], text)),) + e.args[1:]
+    else:
+        e.args = (text,)
+    if e.msg:
+        e.msg = "\n".join((e.msg, text))
+    raise
+
+
+### ----------------------------------------
+### --- Global Variables
+### ----------------------------------------
+Future = False ### TODO: Flag to enable future features
+### ----------------------------------------
+### --- /Global Variables
+### ----------------------------------------
 
 
 ### ----------------------------------------
 ### --- Class Command
 ### ----------------------------------------
 class Command:
+    ACCOUNTS_UPGRADE = "accounts-upgrade"
     ADD = "add"
     CERTBOT = "certbot"
     CHANGE = "change"
@@ -86,8 +107,6 @@ Then setup the DNS records and verify the setup with the `check` command.\n\
 Finally use this script as a certbot plugin via `--manual --preferred-challenges dns --manual-auth-hook '/path/to/{script:s} certbot'` to retrieve a certificate with certbot's `certonly` command.\n\
 For acme.sh copy the wrapper script 'dns_acmednsclient2.sh' to '/path/to/acme.sh/dnsapi/' and use it via `--dns dns_acmednsclient2`.".format(script=os.path.basename(sys.argv[0]).replace(".py", ".sh"))
 
-    Future = False
-
     ### Build Arg Parser
     parser = argparse.ArgumentParser(description=description, epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
     ### path to config file
@@ -99,18 +118,25 @@ For acme.sh copy the wrapper script 'dns_acmednsclient2.sh' to '/path/to/acme.sh
     ### commands
     subparsers = parser.add_subparsers(title="commands", description=None, dest="command", help="Use `<command> --help` for details", metavar="command")
     #
+    parser_accounts_upgrade = subparsers.add_parser(Command.ACCOUNTS_UPGRADE, help="upgrade domain accounts file (add default data)")
+    #
     parser_add = subparsers.add_parser(Command.ADD, help="add an already registered domain (to client only)")
     parser_add.add_argument("--domain", "-d", action="store", required=True, help="domain to add")
     parser_add.add_argument("--fulldomain", "-f", action="store", required=True, help="related auth domain in full")
     parser_add.add_argument("--username", "-u", action="store", required=True, help="username of auth domain")
     parser_add.add_argument("--password", "-p", action="store", required=True, help="password of auth domain")
-    parser_add.add_argument("--server", "-s", action="store", required=True, help="base URL of server with acme-dns API to register with")
+    parser_add.add_argument("--server", "-s", action="store", required=False, help="base URL of server with acme-dns API to register with")
+    parser_add.add_argument("--change", action="store", required=False, default=acmednsclient2.Configuration.DEFAULT_URL_PATH_CHANGE, help="URL path of server to change registration")
+    parser_add.add_argument("--clean", action="store", required=False, default=acmednsclient2.Configuration.DEFAULT_URL_PATH_CLEAN, help="URL path of server to clean token")
+    parser_add.add_argument("--deregister", action="store", required=False, default=acmednsclient2.Configuration.DEFAULT_URL_PATH_DEREGISTER, help="URL path of server to deregister")
+    parser_add.add_argument("--register", action="store", required=False, default=acmednsclient2.Configuration.DEFAULT_URL_PATH_REGISTER, help="URL path of server to register")
+    parser_add.add_argument("--update", action="store", required=False, default=acmednsclient2.Configuration.DEFAULT_URL_PATH_UPDATE, help="URL path of server to update token")
     parser_add.add_argument("--allow", "-a", action="append", required=False, help="ip to allow updates from, can be specified multiple times (for completeness only)")
     parser_add.add_argument("--force", action="store_true", required=False, help="force addition if domain already registered (data loss)")
     #
     parser_certbot = subparsers.add_parser(Command.CERTBOT, help="run as manual-auth-hook with certbot")
     #
-    if Future: ### possible future acme-dns functionality (security concerns?)
+    if Future: # TODO/Change: possible future acme-dns functionality (security concerns?)
         parser_change = subparsers.add_parser(Command.CHANGE, help="change details of a registered domain (if supported by server)")
         parser_change.add_argument("--domain", "-d", action="store", required=True, help="domain to change details of")
         group = parser_change.add_mutually_exclusive_group(required=True)
@@ -121,14 +147,14 @@ For acme.sh copy the wrapper script 'dns_acmednsclient2.sh' to '/path/to/acme.sh
     parser_check = subparsers.add_parser(Command.CHECK, help="check DNS setup of a registered domain")
     parser_check.add_argument("--domain", "-d", action="store", required=True, help="domain to check")
     #
-    if Future: ### possible future acme-dns functionality
+    if Future: # TODO/Clean: possible future acme-dns functionality
         parser_clean = subparsers.add_parser(Command.CLEAN, help="clean challenge token of a registered domain (if supported by server)")
         parser_clean.add_argument("--domain", "-d", action="store", required=True, help="domain to update")
         parser_clean.add_argument("--token", "-t", action="store", required=True, help="token to clean")
     #
     parser_config = subparsers.add_parser(Command.CONFIG, help="list configuration")
     #
-    if Future: ### possible future acme-dns functionality (security concerns?)
+    if Future: # TODO/Deregister: possible future acme-dns functionality (security concerns?)
         parser_deregister = subparsers.add_parser(Command.DEREGISTER, help="deregister a domain (if supported by server)")
         parser_deregister.add_argument("--domain", "-d", action="store", required=True, help="domain to deregister")
     #
@@ -137,6 +163,11 @@ For acme.sh copy the wrapper script 'dns_acmednsclient2.sh' to '/path/to/acme.sh
     parser_register = subparsers.add_parser(Command.REGISTER, help="register a domain")
     parser_register.add_argument("--domain", "-d", action="store", required=True, help="domain to register")
     parser_register.add_argument("--server", "-s", action="store", required=False, help="base URL of server with acme-dns API to register with")
+    parser_register.add_argument("--change", action="store", required=False, default=acmednsclient2.Configuration.DEFAULT_URL_PATH_CHANGE, help="URL path of server to change registration")
+    parser_register.add_argument("--clean", action="store", required=False, default=acmednsclient2.Configuration.DEFAULT_URL_PATH_CLEAN, help="URL path of server to clean token")
+    parser_register.add_argument("--deregister", action="store", required=False, default=acmednsclient2.Configuration.DEFAULT_URL_PATH_DEREGISTER, help="URL path of server to deregister")
+    parser_register.add_argument("--register", action="store", required=False, default=acmednsclient2.Configuration.DEFAULT_URL_PATH_REGISTER, help="URL path of server to register")
+    parser_register.add_argument("--update", action="store", required=False, default=acmednsclient2.Configuration.DEFAULT_URL_PATH_UPDATE, help="URL path of server to update token")
     parser_register.add_argument("--allow", "-a", action="append", required=False, help="ip to allow updates from; can be specified multiple times")
     parser_register.add_argument("--force", action="store_true", required=False, help="force registeration if domain already registered (data loss)")
     #
@@ -188,10 +219,10 @@ if __name__ == "__main__":
         print("Empty/whitespace-only accounts file specified. Specified via --accounts", file=sys.stderr)
         sys.exit(1)
     #
-    Config = acmednsclient2.Configuration(Arguments.config, Arguments.accounts)
+    Config = acmednsclient2.Configuration(configpath=Arguments.config, accountspath=Arguments.accounts)
 
     ### Read domain accounts
-    Accounts = acmednsclient2.DomainAccounts(Config.settings[Config.ATTR_PATH_ACCOUNTS])
+    Accounts = acmednsclient2.DomainAccounts(config=Config)
 
     ### Process command...
     ### show version
@@ -222,11 +253,11 @@ if __name__ == "__main__":
     elif Arguments.command == Command.SHOW:
         Key = Arguments.domain
 
-        Data = Accounts.get(Key)
+        Data = Accounts.get(key=Key)
         if not Data:
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
             print("Domain \"{domain:s}\" not found".format(domain=Key), file=sys.stderr)
-            Key_Clean = Accounts.sanitizeDomain(Key.strip())
+            Key_Clean = Accounts.sanitizeDomain(key=Key.strip())
             if Key_Clean != Key \
             and Key_Clean in Accounts.domains:
                 print("Did you mean domain \"{domain:s}\"?".format(domain=Key_Clean), file=sys.stderr)
@@ -236,13 +267,17 @@ if __name__ == "__main__":
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]))
         print(json.dumps(Data, indent=4))
         sys.exit(0)
+    ### upgrade domain accounts file (add default data)
+    elif Arguments.command == Command.ACCOUNTS_UPGRADE:
+        Accounts.save()
+        sys.exit(0)
     ### add an already registered domain (to client only)
     ### register a domain
     elif Arguments.command == Command.ADD \
     or Arguments.command == Command.REGISTER:
         Key = None
         if Arguments.domain is not None:
-            Key = Accounts.sanitizeDomain(Arguments.domain.strip())
+            Key = Accounts.sanitizeDomain(key=Arguments.domain.strip())
 
         Server = None
         if Arguments.server is not None:
@@ -250,6 +285,11 @@ if __name__ == "__main__":
             Server_Message = "Specified via --server"
         elif Config.settings[Config.ATTR_URL_DEFAULT_SERVER]:
             Server = Config.settings[Config.ATTR_URL_DEFAULT_SERVER].strip()
+            Arguments.change = Config.settings[Config.ATTR_URL_DEFAULT_PATH_CHANGE]
+            Arguments.clean = Config.settings[Config.ATTR_URL_DEFAULT_PATH_CLEAN]
+            Arguments.deregister = Config.settings[Config.ATTR_URL_DEFAULT_PATH_DEREGISTER]
+            Arguments.register = Config.settings[Config.ATTR_URL_DEFAULT_PATH_REGISTER]
+            Arguments.update = Config.settings[Config.ATTR_URL_DEFAULT_PATH_UPDATE]
             Server_Message = "Specified via config file"
         else:
             Server_Message = "Specify via --server"
@@ -262,19 +302,36 @@ if __name__ == "__main__":
                 print("Empty/whitespace-only server not allowed. {message:s}".format(message=Server_Message), file=sys.stderr)
             sys.exit(1)
 
-        if Arguments.command == Command.ADD \
-        and ( \
-            not (Arguments.fulldomain and Arguments.fulldomain.strip()) \
-            or not (Arguments.username and Arguments.username.strip()) \
-            or not (Arguments.password and Arguments.password.strip()) \
+        if not (Arguments.change is None or Arguments.change.strip()) \
+        or not (Arguments.clean is None or Arguments.clean.strip()) \
+        or not (Arguments.deregister is None or Arguments.deregister.strip()) \
+        or not (Arguments.register is None or Arguments.register.strip()) \
+        or not (Arguments.update is None or Arguments.update.strip()) \
+        or (Arguments.command == Command.ADD \
+            and ( \
+                not (Arguments.fulldomain and Arguments.fulldomain.strip()) \
+                or not (Arguments.username and Arguments.username.strip()) \
+                or not (Arguments.password and Arguments.password.strip()) \
+            )
         ):
             print("Empty/whitespace-only arguments not allowed", file=sys.stderr)
             sys.exit(1)
 
+        if not Arguments.change:
+            Arguments.change = Config.DEFAULT_URL_PATH_CHANGE
+        if not Arguments.clean:
+            Arguments.clean = Config.DEFAULT_URL_PATH_CLEAN
+        if not Arguments.deregister:
+            Arguments.deregister = Config.DEFAULT_URL_PATH_DEREGISTER
+        if not Arguments.register:
+            Arguments.register = Config.DEFAULT_URL_PATH_REGISTER
+        if not Arguments.update:
+            Arguments.update = Config.DEFAULT_URL_PATH_UPDATE
+
         if Arguments.force:
-            Accounts.remove(Key)
+            Accounts.remove(key=Key)
         else:
-            Data = Accounts.get(Key)
+            Data = Accounts.get(key=Key)
             if Data:
                 print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
                 print("Domain \"{domain:s}\" already exists".format(domain=Key), file=sys.stderr)
@@ -284,12 +341,27 @@ if __name__ == "__main__":
 
         if Arguments.command == Command.ADD:
             Subdomain = Arguments.fulldomain.split(".")[0]
-            Data = Accounts.add(Key, Arguments.fulldomain, Subdomain, Arguments.username, Arguments.password, Server, allowfrom=Arguments.allow)
+            Data = Accounts.add(key=Key, fulldomain=Arguments.fulldomain, subdomain=Subdomain,
+                                username=Arguments.username, password=Arguments.password,
+                                server_url=Server,
+                                server_path_change=Arguments.change,
+                                server_path_clean=Arguments.clean,
+                                server_path_deregister=Arguments.deregister,
+                                server_path_register=Arguments.register,
+                                server_path_update=Arguments.update,
+                                allowfrom=Arguments.allow)
             if not Data:
                 print("Domain \"{domain:s}\" could not be added".format(domain=Key), file=sys.stderr)
                 sys.exit(1)
         elif Arguments.command == Command.REGISTER:
-            Data, Message, Code = Accounts.register(Key, Server, allowfrom=Arguments.allow)
+            Data, Message, Code = Accounts.register(key=Key,
+                                                    server_url=Server,
+                                                    server_path_change=Arguments.change,
+                                                    server_path_clean=Arguments.clean,
+                                                    server_path_deregister=Arguments.deregister,
+                                                    server_path_register=Arguments.register,
+                                                    server_path_update=Arguments.update,
+                                                    allowfrom=Arguments.allow)
             if not Data:
                 print("Domain \"{domain:s}\" could not be registered via {server:s}".format(domain=Key, server=Server), file=sys.stderr)
                 print("Check server URL, acme-dns server and related DNS setup (NS, A/AAAA or glue records)", file=sys.stderr)
@@ -309,7 +381,7 @@ if __name__ == "__main__":
 
         ### Add the first TXT record to a newly registered domain for checking the setup
         if Arguments.command == Command.REGISTER:
-            result = Accounts.update(Data, Accounts.TOKEN_DUMMY)
+            result = Accounts.update(accdata=Data, token=Accounts.TOKEN_DUMMY)
             if not result[0]:
                 print("Domain \"{domain:s}\" could not be updated with dummy token".format(domain=Key), file=sys.stderr)
                 print("{message:s}".format(message=result[1]), file=sys.stderr)
@@ -322,18 +394,18 @@ if __name__ == "__main__":
     or Arguments.command == Command.DEREGISTER:
         Key = Arguments.domain
 
-        Data = Accounts.get(Key)
+        Data = Accounts.get(key=Key)
         if not Data:
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
             print("Domain \"{domain:s}\" not found".format(domain=Key), file=sys.stderr)
-            Key_Clean = Accounts.sanitizeDomain(Key.strip())
+            Key_Clean = Accounts.sanitizeDomain(key=Key.strip())
             if Key_Clean != Key \
             and Key_Clean in Accounts.domains:
                 print("Did you mean domain \"{domain:s}\"?".format(domain=Key_Clean), file=sys.stderr)
             sys.exit(1)
 
         if Arguments.command == Command.DEREGISTER:
-            result = Accounts.deregister(Data)
+            result = Accounts.deregister(accdata=Data)
             if not result[0]:
                 print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
                 print("Domain \"{domain:s}\" could not be deregistered".format(domain=Key), file=sys.stderr)
@@ -343,7 +415,7 @@ if __name__ == "__main__":
                 else:
                     sys.exit(1)
 
-        if not Accounts.remove(Key):
+        if not Accounts.remove(key=Key):
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
             print("Domain \"{domain:s}\" not found".format(domain=Key), file=sys.stderr)
             sys.exit(1)
@@ -356,7 +428,7 @@ if __name__ == "__main__":
 
         New = None
         if Arguments.new is not None:
-            New = Accounts.sanitizeDomain(Arguments.new.strip())
+            New = Accounts.sanitizeDomain(key=Arguments.new.strip())
         if not New:
             print("Empty/whitespace-only new domain not allowed. Specified via --new", file=sys.stderr)
             sys.exit(1)
@@ -368,7 +440,7 @@ if __name__ == "__main__":
             Error = True
             Text = "Old domain \"{domain:s}\" not found".format(domain=Key)
             #
-            Key_Clean = Accounts.sanitizeDomain(Key.strip())
+            Key_Clean = Accounts.sanitizeDomain(key=Key.strip())
             if Key_Clean != Key \
             and Key_Clean in Accounts.domains:
                 Text = "\n".join((Text, "Did you mean domain \"{domain:s}\"?".format(domain=Key_Clean)))
@@ -393,7 +465,7 @@ if __name__ == "__main__":
             print("{message:s}".format(message=Message), file=sys.stderr)
             sys.exit(1)
 
-        Data = Accounts.rename(Key, New)
+        Data = Accounts.rename(key_from=Key, key_to=New)
         if not Data:
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
             print("Domain \"{domain:s}\" could not be renamed".format(domain=Key), file=sys.stderr)
@@ -409,10 +481,10 @@ if __name__ == "__main__":
     or Arguments.command == Command.CERTBOT:
         Key = None
         if Arguments.command == Command.CERTBOT:
-            Key = Accounts.sanitizeDomain(os.environ["CERTBOT_DOMAIN"])
+            Key = Accounts.sanitizeDomain(key=os.environ["CERTBOT_DOMAIN"])
             Key_Message = "Specified via env CERTBOT_DOMAIN"
         elif Arguments.domain is not None:
-            Key = Accounts.sanitizeDomain(Arguments.domain.strip())
+            Key = Accounts.sanitizeDomain(key=Arguments.domain.strip())
             Key_Message = "Specified via --domain"
         else:
             Key_Message = "Specify via --domain"
@@ -439,21 +511,21 @@ if __name__ == "__main__":
                 print("Empty/whitespace-only token not allowed. {message:s}".format(message=Token_Message), file=sys.stderr)
             sys.exit(1)
 
-        Data = Accounts.get(Key)
+        Data = Accounts.get(key=Key)
         if not Data:
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
             print("Domain \"{domain:s}\" not found".format(domain=Key), file=sys.stderr)
             sys.exit(1)
 
         if Arguments.command == Command.CLEAN:
-            result = Accounts.clean(Data, Token)
+            result = Accounts.clean(accdata=Data, token=Token)
             if not result[0]:
                 print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
                 print("Domain \"{domain:s}\" Token \"{token:s}\" could not be cleaned".format(domain=Key, token=Token), file=sys.stderr)
                 print("{message:s}".format(message=result[1]), file=sys.stderr)
                 sys.exit(0) ### no error as acme-dns keeps only the last 2 txt records (normal/wildcard)
         else:
-            result = Accounts.update(Data, Token)
+            result = Accounts.update(accdata=Data, token=Token)
             if not result[0]:
                 print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
                 print("Domain \"{domain:s}\" could not be updated".format(domain=Key), file=sys.stderr)
@@ -465,7 +537,7 @@ if __name__ == "__main__":
     elif Arguments.command == Command.CHECK:
         Key = None
         if Arguments.domain is not None:
-            Key = Accounts.sanitizeDomain(Arguments.domain.strip())
+            Key = Accounts.sanitizeDomain(key=Arguments.domain.strip())
             Key_Message = "Specified via --domain"
         else:
             Key_Message = "Specify via --domain"
@@ -473,13 +545,13 @@ if __name__ == "__main__":
         if not Key:
             print("Empty/whitespace-only domain not allowed. {message:s}".format(message=Key_Message), file=sys.stderr)
 
-        Data = Accounts.get(Key)
+        Data = Accounts.get(key=Key)
         if not Data:
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
             print("Domain \"{domain:s}\" not found".format(domain=Key), file=sys.stderr)
             sys.exit(1)
 
-        result = Accounts.check(Data, Config.settings[Config.ATTR_IPS_NAME_SERVERS])
+        result = Accounts.check(accdata=Data, nameservers=Config.settings[Config.ATTR_IPS_NAME_SERVERS])
         if not result[0]:
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
             print("Domain \"{domain:s}\" DNS check has FAILED: {message:s}".format(domain=Key, message=result[1]), file=sys.stderr)
@@ -491,7 +563,7 @@ if __name__ == "__main__":
     elif Arguments.command == Command.CHANGE:
         Key = None
         if Arguments.domain is not None:
-            Key = Accounts.sanitizeDomain(Arguments.domain.strip())
+            Key = Accounts.sanitizeDomain(key=Arguments.domain.strip())
             Key_Message = "Specified via --domain"
         else:
             Key_Message = "Specify via --domain"
@@ -500,7 +572,7 @@ if __name__ == "__main__":
             print("Empty/whitespace-only domain not allowed. {message:s}".format(message=Key_Message), file=sys.stderr)
             sys.exit(1)
 
-        Data = Accounts.get(Key)
+        Data = Accounts.get(key=Key)
         if not Data:
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
             print("Domain \"{domain:s}\" not found".format(domain=Key), file=sys.stderr)
@@ -518,7 +590,7 @@ if __name__ == "__main__":
             if not Allow_From:
                 Allow_From = None
 
-        result = Accounts.change(Data, allowfrom=Allow_From)
+        result = Accounts.change(accdata=Data, allowfrom=Allow_From)
         if not result[0]:
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
             print("Domain \"{domain:s}\" details could not be changed".format(domain=Key), file=sys.stderr)

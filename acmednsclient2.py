@@ -16,7 +16,7 @@ Authors:
 ### TODO: complete docstrings
 
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
@@ -27,17 +27,29 @@ __contact__ = __homepage__
 ### python standard modules
 import collections
 import datetime
-import json5 as json ### SPEEDUP: switch to standard 'json' module, but then avoid comments and extra commas in your configuration
 import os
 import typing
+import urllib.parse
 
 ### 3rd-party modules
 ## https://pypi.org/project/dnspython/
 import dns.exception
 import dns.rdatatype
 import dns.resolver
+## https://pypi.org/project/json5/
+import json5 as json ### SPEEDUP: switch to standard 'json' module, but then avoid comments and extra commas in both JSON files
 ## https://pypi.org/project/requests/
 import requests
+
+### Check for json5 otherwise fallback to json arguments
+JSON5_DUMP_KWARGS = {"quote_keys": True, "trailing_commas": False}
+JSON5_TEST = {"Test1": "1", "Test2": 2}
+try:
+    RESULT = json.dumps(JSON5_TEST, indent=4, **JSON5_DUMP_KWARGS)
+except TypeError as e: ### fallback to  for json.dump()
+    JSON5_DUMP_KWARGS = {}
+    RESULT = json.dumps(JSON5_TEST, indent=4, **JSON5_DUMP_KWARGS)
+del JSON5_TEST, RESULT
 
 
 ### ----------------------------------------
@@ -48,9 +60,9 @@ class Configuration:
     Handles configuration for acme-dns-client-2
 
     Defines default configuration and loads settings from a JSON configuration file.
-    Configuration is kept in dictionary `.settings`. Use ATTR_ constants to access the settings.
-
+    Configuration is kept in dictionary `.settings`.
     Provides constants (all uppercase) for default values plus attribute names of settings.
+    Use `ATTR_...` constants to access each setting.
     """
 
     ### Constants for default values
@@ -85,12 +97,22 @@ class Configuration:
         #"2620:119:53::53",
         #"208.67.220.220",
     )
+    DEFAULT_URL_PATH_CHANGE = "/change"
+    DEFAULT_URL_PATH_CLEAN = "/clean"
+    DEFAULT_URL_PATH_DEREGISTER = "/deregister"
+    DEFAULT_URL_PATH_REGISTER = "/register"
+    DEFAULT_URL_PATH_UPDATE = "/update"
 
     ### Constants of setting attribute names in configuration
     ATTR_PATH_CONFIG = "configpath"
     ATTR_PATH_ACCOUNTS = "accountspath"
     ATTR_IPS_NAME_SERVERS = "nameservers"
     ATTR_URL_DEFAULT_SERVER = "default_server"
+    ATTR_URL_DEFAULT_PATH_CHANGE = "default_server_path_change"
+    ATTR_URL_DEFAULT_PATH_CLEAN = "default_server_path_clean"
+    ATTR_URL_DEFAULT_PATH_DEREGISTER = "default_server_path_deregister"
+    ATTR_URL_DEFAULT_PATH_REGISTER = "default_server_path_register"
+    ATTR_URL_DEFAULT_PATH_UPDATE = "default_server_path_update"
 
     def __init__(self, configpath:str, accountspath:typing.Union[str,None]=None) -> None:
         """
@@ -122,6 +144,11 @@ class Configuration:
         else:
             self.settings[self.ATTR_PATH_ACCOUNTS] = os.path.join(self.DEFAULT_DIR_CONFIG, self.DEFAULT_FILE_DOMAIN_ACCOUNTS)
         self.settings[self.ATTR_URL_DEFAULT_SERVER] = None
+        self.settings[self.ATTR_URL_DEFAULT_PATH_CHANGE] = self.DEFAULT_URL_PATH_CHANGE
+        self.settings[self.ATTR_URL_DEFAULT_PATH_CLEAN] = self.DEFAULT_URL_PATH_CLEAN
+        self.settings[self.ATTR_URL_DEFAULT_PATH_DEREGISTER] = self.DEFAULT_URL_PATH_DEREGISTER
+        self.settings[self.ATTR_URL_DEFAULT_PATH_REGISTER] = self.DEFAULT_URL_PATH_REGISTER
+        self.settings[self.ATTR_URL_DEFAULT_PATH_UPDATE] = self.DEFAULT_URL_PATH_UPDATE
         self.settings[self.ATTR_IPS_NAME_SERVERS] = list(self.DEFAULT_NAME_SERVERS)
     # --- /Configuration._resetWithDefaults()
 
@@ -142,6 +169,7 @@ class Configuration:
 
         ### check if JSON file exists
         if not os.path.exists(self._jsonpath):
+            # TODO: Error out, as normally created via install.sh?
             return
 
         filedata = None
@@ -184,6 +212,11 @@ class DomainAccounts:
 
     ### additional attributes of clients
     ATTR_SERVER_URL = "server_url"
+    ATTR_SERVER_URL_PATH_CHANGE = "server_path_change"
+    ATTR_SERVER_URL_PATH_CLEAN = "server_path_clean"
+    ATTR_SERVER_URL_PATH_DEREGISTER = "server_path_deregister"
+    ATTR_SERVER_URL_PATH_REGISTER = "server_path_register"
+    ATTR_SERVER_URL_PATH_UPDATE = "server_path_update"
     ATTR_ADDED_ON = "added_on"
     ATTR_ADDED_VIA = "added_via"
 
@@ -195,24 +228,25 @@ class DomainAccounts:
 
     ### misc constants
     DOMAIN_CHALLENGE_PREFIX = "_acme-challenge."
+    DOMAIN_CHALLENGE_PREFIX_LEN = len(DOMAIN_CHALLENGE_PREFIX)
     TOKEN_DUMMY = "-DUMMY-DUMMY-DUMMY-DUMMY-DUMMY-DUMMY-DUMMY-"
 
-    def __init__(self, accountspath:str) -> None:
+    def __init__(self, config:Configuration) -> None:
         """
         Creates dictionary for domain acounts and loads accounts from the given JSON file.
         """
 
         ### keep given arguments separately
-        self._jsonpath = accountspath
+        self._jsonpath = config.settings[config.ATTR_PATH_ACCOUNTS]
 
         ### create dictionary for domain accounts
         self.domains = collections.OrderedDict()
 
         ### load from domain accounts file if available
-        self._loadFromFile()
+        self._loadFromFile(config=config)
     # --- /DomainAccounts.__init__()
 
-    def _loadFromFile(self) -> None:
+    def _loadFromFile(self, config:Configuration) -> None:
         """
         First clears domain accounts.
         Then loads account domains from JSON file if available.
@@ -223,12 +257,14 @@ class DomainAccounts:
         self.domains.clear()
 
         if not os.path.exists(self._jsonpath):
+            # TODO: Error out, as normally created via install.sh?
             return
 
         filedata = None
         with open(self._jsonpath, mode="r") as fd:
             filedata = json.load(fd)
 
+        default_server = config.settings[config.ATTR_URL_DEFAULT_SERVER]
         for key, fileaccdata in sorted(filedata.items()):
             accdata = collections.OrderedDict()
             #
@@ -236,7 +272,48 @@ class DomainAccounts:
             accdata[self.ATTR_SUBDOMAIN] = fileaccdata.pop(self.ATTR_SUBDOMAIN)
             accdata[self.ATTR_USERNAME] = fileaccdata.pop(self.ATTR_USERNAME)
             accdata[self.ATTR_PASSWORD] = fileaccdata.pop(self.ATTR_PASSWORD)
-            accdata[self.ATTR_SERVER_URL] = fileaccdata.pop(self.ATTR_SERVER_URL)
+            server = fileaccdata.pop(self.ATTR_SERVER_URL)
+            accdata[self.ATTR_SERVER_URL] = server
+            #
+            try:
+                accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_CHANGE)
+            except KeyError as e:
+                if server == default_server:
+                    accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = config.settings[config.ATTR_URL_DEFAULT_PATH_CHANGE]
+                else:
+                    accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = config.DEFAULT_URL_PATH_CHANGE
+            #
+            try:
+                accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_CLEAN)
+            except KeyError as e:
+                if server == default_server:
+                    accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = config.settings[config.ATTR_URL_DEFAULT_PATH_CLEAN]
+                else:
+                    accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = config.DEFAULT_URL_PATH_CLEAN
+            #
+            try:
+                accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_DEREGISTER)
+            except KeyError as e:
+                if server == default_server:
+                    accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = config.settings[config.ATTR_URL_DEFAULT_PATH_DEREGISTER]
+                else:
+                    accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = config.DEFAULT_URL_PATH_DEREGISTER
+            #
+            try:
+                accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_REGISTER)
+            except KeyError as e:
+                if server == default_server:
+                    accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = config.settings[config.ATTR_URL_DEFAULT_PATH_REGISTER]
+                else:
+                    accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = config.DEFAULT_URL_PATH_REGISTER
+            #
+            try:
+                accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_UPDATE)
+            except KeyError as e:
+                if server == default_server:
+                    accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = config.settings[config.ATTR_URL_DEFAULT_PATH_UPDATE]
+                else:
+                    accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = config.DEFAULT_URL_PATH_UPDATE
             #
             try:
                 accdata[self.ATTR_ADDED_ON] = fileaccdata.pop(self.ATTR_ADDED_ON)
@@ -251,7 +328,7 @@ class DomainAccounts:
             ### keep additional data from other sources or future versions
             accdata.update(fileaccdata)
 
-            self.domains[key] = collections.OrderedDict(accdata)
+            self.domains[key] = accdata
     # --- /DomainAccounts._loadFromFile()
 
     @classmethod
@@ -269,7 +346,7 @@ class DomainAccounts:
                 key = key[2:]
                 continue
             if key.startswith(cls.DOMAIN_CHALLENGE_PREFIX):
-                key = key[len(cls.DOMAIN_CHALLENGE_PREFIX):]
+                key = key[cls.DOMAIN_CHALLENGE_PREFIX_LEN:]
                 continue
             break
 
@@ -288,7 +365,7 @@ class DomainAccounts:
 
         accdata[cls.ATTR_KEY] = key
 
-        accdata.update(cls._determineRelatedDomains(accdata))
+        accdata.update(cls._determineRelatedDomains(accdata=accdata))
     # --- /DomainAccounts._enhanceEntry()
 
     @classmethod
@@ -324,7 +401,7 @@ class DomainAccounts:
 
         ### write sorted domain accounts
         with os.fdopen(os.open(self._jsonpath, flags=os.O_WRONLY|os.O_TRUNC|os.O_CREAT, mode=0o0600), mode="w") as fd:
-            json.dump(filedata, fd, indent=4)
+            json.dump(filedata, fd, indent=4, **JSON5_DUMP_KWARGS)
     # --- /DomainAccounts.save()
 
     def get(self, key:str) -> typing.Union[dict,None]:
@@ -340,12 +417,20 @@ class DomainAccounts:
         except KeyError as e:
             return None
 
-        self._enhanceEntry(key, accdata)
+        self._enhanceEntry(key=key, accdata=accdata)
 
         return accdata
     # --- /DomainAccounts.get()
 
-    def add(self, key:str, fulldomain:str, subdomain:str, username:str, password:str, server_url:str, allowfrom:typing.Union[list,None]=None) -> typing.Union[dict,None]:
+    def add(self, key:str, fulldomain:str, subdomain:str,
+            username:str, password:str,
+            server_url:str,
+            server_path_change:str,
+            server_path_clean:str,
+            server_path_deregister:str,
+            server_path_register:str,
+            server_path_update:str,
+            allowfrom:typing.Union[list,None]=None) -> typing.Union[dict,None]:
         """
         Adds domain account data for a domain key.
         The domain key is sanitized down to the base domain.
@@ -354,7 +439,7 @@ class DomainAccounts:
         Useful to add already existing domain registration from another client and/or machine.
         """
 
-        key = self.sanitizeDomain(key)
+        key = self.sanitizeDomain(key=key)
 
         if key in self.domains:
             return None
@@ -367,15 +452,23 @@ class DomainAccounts:
         accdata[self.ATTR_PASSWORD] = password
         accdata[self.ATTR_SERVER_URL] = server_url
         #
+        accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = server_path_change
+        accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = server_path_clean
+        accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = server_path_deregister
+        accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = server_path_register
+        accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = server_path_update
+        #
         accdata[self.ATTR_ADDED_ON] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         accdata[self.ATTR_ADDED_VIA] = "add"
         #
         if allowfrom:
             accdata[self.ATTR_ALLOW_FROM] = allowfrom
+        else:
+            accdata[self.ATTR_ALLOW_FROM] = []
 
         self.domains[key] = collections.OrderedDict(accdata)
 
-        self._enhanceEntry(key, accdata)
+        self._enhanceEntry(key=key, accdata=accdata)
 
         return accdata
     # --- /DomainAccounts.add()
@@ -405,7 +498,7 @@ class DomainAccounts:
         except KeyError as e:
             return None
 
-        self._enhanceEntry(key_to, accdata)
+        self._enhanceEntry(key=key_to, accdata=accdata)
 
         return accdata
     # --- /DomainAccounts.get()
@@ -432,22 +525,33 @@ class DomainAccounts:
         return api_data
     # --- /DomainAccounts._setApiData()
 
-    def register(self, key:str, server_url:str, allowfrom:typing.Union[list,None]=None) -> typing.Tuple[typing.Union[dict,None],str,int]:
-        key = self.sanitizeDomain(key)
+    def register(self, key:str,
+                 server_url:str,
+                 server_path_change:str,
+                 server_path_clean:str,
+                 server_path_deregister:str,
+                 server_path_register:str,
+                 server_path_update:str,
+                 allowfrom:typing.Union[list,None]=None) -> typing.Tuple[typing.Union[dict,None],str,int]:
+        key = self.sanitizeDomain(key=key)
 
         if key in self.domains:
             return None, "Domain account data already exist", -1
 
-        request_headers = self._setApiHeaders(None)
+        request_headers = self._setApiHeaders(accdata=None)
 
-        request_data = self._setApiData(None)
+        request_data = self._setApiData(accdata=None)
         if allowfrom:
             request_data[self.ATTR_ALLOW_FROM] = allowfrom
 
+        ### convert request data into JSON format; post() json parameter = requests 2.4.2+
+        request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
+
+        request_url = urllib.parse.urljoin(server_url, server_path_register)
         request_response = requests.post(
-            url="{server_url:s}/register".format(server_url=server_url),
+            url=request_url,
             headers=request_headers,
-            data=json.dumps(request_data), ### json parameter = requests 2.4.2+
+            data=request_data,
         )
 
         message = ""
@@ -456,8 +560,9 @@ class DomainAccounts:
             message = "{code:d} Error: \"{reason:s}\" for URL \"{url}\"".format(code=request_response.status_code, reason=request_response.reason, url=request_response.url)
             #
             try:
-                text = json.dumps(request_response.json(), indent=4)
-            except:
+                text = request_response.json()
+                text = json.dumps(text, indent=4, **JSON5_DUMP_KWARGS)
+            except requests.JSONDecodeError as e:
                 text = request_response.text.rstrip("\n")
             message = "\n".join((message, text))
             #
@@ -473,6 +578,28 @@ class DomainAccounts:
         accdata[self.ATTR_PASSWORD] = apiaccdata.pop(self.ATTR_PASSWORD)
         accdata[self.ATTR_SERVER_URL] = server_url
         #
+        try:
+            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_CHANGE)
+        except KeyError as e:
+            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = server_path_change
+        #
+        try:
+            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_CLEAN)
+        except KeyError as e:
+            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = server_path_clean
+        #
+        try:
+            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_DEREGISTER)
+        except KeyError as e:
+            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = server_path_deregister
+        #
+        accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = server_path_register
+        #
+        try:
+            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_UPDATE)
+        except KeyError as e:
+            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = server_path_update
+        #
         accdata[self.ATTR_ADDED_ON] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         accdata[self.ATTR_ADDED_VIA] = "register"
 
@@ -481,7 +608,7 @@ class DomainAccounts:
 
         self.domains[key] = collections.OrderedDict(accdata)
 
-        self._enhanceEntry(key, accdata)
+        self._enhanceEntry(key=key, accdata=accdata)
 
         return accdata, message, request_response.status_code
     # --- /DomainAccounts.register()
@@ -491,15 +618,19 @@ class DomainAccounts:
         if not accdata:
             return False, "Missing domain account data", -1
 
-        request_headers = cls._setApiHeaders(accdata)
+        request_headers = cls._setApiHeaders(accdata=accdata)
 
-        request_data = cls._setApiData(accdata)
+        request_data = cls._setApiData(accdata=accdata)
         request_data["txt"] = token
 
+        ### convert request data into JSON format; post() json parameter = requests 2.4.2+
+        request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
+
+        request_url = urllib.parse.urljoin(accdata[cls.ATTR_SERVER_URL], accdata[cls.ATTR_SERVER_URL_PATH_UPDATE])
         request_response = requests.post(
-            url="{server_url:s}/update".format(server_url=accdata[cls.ATTR_SERVER_URL]),
+            url=request_url,
             headers=request_headers,
-            data=json.dumps(request_data), ### json parameter = requests 2.4.2+
+            data=request_data,
         )
 
         message = ""
@@ -508,8 +639,9 @@ class DomainAccounts:
             message = "{code:d} Error: \"{reason:s}\" for URL \"{url}\"".format(code=request_response.status_code, reason=request_response.reason, url=request_response.url)
             #
             try:
-                text = json.dumps(request_response.json(), indent=4)
-            except:
+                text = request_response.json()
+                text = json.dumps(text, indent=4, **JSON5_DUMP_KWARGS)
+            except requests.JSONDecodeError as e:
                 text = request_response.text.rstrip("\n")
             message = "\n".join((message, text))
             #
@@ -523,14 +655,18 @@ class DomainAccounts:
         if not accdata:
             return False, "Missing domain account data", -1
 
-        request_headers = cls._setApiHeaders(accdata)
+        request_headers = cls._setApiHeaders(accdata=accdata)
 
-        request_data = cls._setApiData(accdata)
+        request_data = cls._setApiData(accdata=accdata)
 
+        ### convert request data into JSON format; post() json parameter = requests 2.4.2+
+        request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
+
+        request_url = urllib.parse.urljoin(accdata[cls.ATTR_SERVER_URL], accdata[cls.ATTR_SERVER_URL_PATH_DEREGISTER])
         request_response = requests.post(
-            url="{server_url:s}/deregister".format(server_url=accdata[cls.ATTR_SERVER_URL]),
+            url=request_url,
             headers=request_headers,
-            data=json.dumps(request_data), ### json parameter = requests 2.4.2+
+            data=request_data,
         )
 
         message = ""
@@ -542,8 +678,9 @@ class DomainAccounts:
                 text = "NOT SUPPORTED by server. OK."
             else:
                 try:
-                    text = json.dumps(request_response.json(), indent=4)
-                except:
+                    text = request_response.json()
+                    text = json.dumps(text, indent=4, **JSON5_DUMP_KWARGS)
+                except requests.JSONDecodeError as e:
                     text = request_response.text.rstrip("\n")
             message = "\n".join((message, text))
             #
@@ -557,15 +694,19 @@ class DomainAccounts:
         if not accdata:
             return False, "Missing domain account data", -1
 
-        request_headers = cls._setApiHeaders(accdata)
+        request_headers = cls._setApiHeaders(accdata=accdata)
 
-        request_data = cls._setApiData(accdata)
+        request_data = cls._setApiData(accdata=accdata)
         request_data["txt"] = token
 
+        ### convert request data into JSON format; post() json parameter = requests 2.4.2+
+        request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
+
+        request_url = urllib.parse.urljoin(accdata[cls.ATTR_SERVER_URL], accdata[cls.ATTR_SERVER_URL_PATH_CLEAN])
         request_response = requests.post(
-            url="{server_url:s}/clean".format(server_url=accdata[cls.ATTR_SERVER_URL]),
+            url=request_url,
             headers=request_headers,
-            data=json.dumps(request_data), ### json parameter = requests 2.4.2+
+            data=request_data,
         )
 
         message = ""
@@ -577,8 +718,9 @@ class DomainAccounts:
                 text = "NOT SUPPORTED by server. OK."
             else:
                 try:
-                    text = json.dumps(request_response.json(), indent=4)
-                except:
+                    text = request_response.json()
+                    text = json.dumps(text, indent=4, **JSON5_DUMP_KWARGS)
+                except requests.JSONDecodeError as e:
                     text = request_response.text.rstrip("\n")
             message = "\n".join((message, text))
             #
@@ -591,18 +733,22 @@ class DomainAccounts:
         if not accdata:
             return None, "Missing domain account data", -1
 
-        request_headers = self._setApiHeaders(accdata)
+        request_headers = self._setApiHeaders(accdata=accdata)
 
-        request_data = self._setApiData(accdata)
+        request_data = self._setApiData(accdata=accdata)
         if allowfrom:
             request_data[self.ATTR_ALLOW_FROM] = allowfrom
         else:
             request_data[self.ATTR_ALLOW_FROM] = None ### explicit clear
 
+        ### convert request data into JSON format; post() json parameter = requests 2.4.2+
+        request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
+
+        request_url = urllib.parse.urljoin(accdata[self.ATTR_SERVER_URL], accdata[self.ATTR_SERVER_URL_PATH_CHANGE])
         request_response = requests.post(
-            url="{server_url:s}/change".format(server_url=accdata[self.ATTR_SERVER_URL]),
+            url=request_url,
             headers=request_headers,
-            data=json.dumps(request_data), ### json parameter = requests 2.4.2+
+            data=request_data,
         )
 
         message = ""
@@ -614,8 +760,9 @@ class DomainAccounts:
                 text = "NOT SUPPORTED by server. OK."
             else:
                 try:
-                    text = json.dumps(request_response.json(), indent=4)
-                except:
+                    text = request_response.json()
+                    text = json.dumps(text, indent=4, **JSON5_DUMP_KWARGS)
+                except requests.JSONDecodeError as e:
                     text = request_response.text.rstrip("\n")
             message = "\n".join((message, text))
             #
@@ -640,13 +787,13 @@ class DomainAccounts:
 
         self.domains[key] = collections.OrderedDict(accdata)
 
-        self._enhanceEntry(key, accdata)
+        self._enhanceEntry(key=key, accdata=accdata)
 
         return accdata, message, request_response.status_code
     # --- /DomainAccounts.change()
 
     @classmethod
-    def _check_cname(cls, accdata:dict, dns_resolver:dns.resolver.Resolver, resolve_func) -> typing.Tuple[bool,str]:
+    def _check_cname(cls, accdata:dict, resolve_func:typing.Callable[...,dns.resolver.Answer]) -> typing.Tuple[bool,str]:
         try:
             ### https://dnspython.readthedocs.io/en/stable/resolver-class.html#dns.resolver.Resolver.resolve
             dns_answers = resolve_func(qname=accdata[cls.ATTR_DOMAIN_CHALLENGE], rdtype=dns.rdatatype.CNAME)
@@ -660,10 +807,10 @@ class DomainAccounts:
                 return True, "Correct CNAME found (DNS)"
 
         return False, "INCORRECT CNAME found (DNS). Expected\n{record:s}".format(record=accdata[cls.ATTR_DOMAIN_CNAME_RECORD])
-    # --- /DomainAccounts.check()
+    # --- /DomainAccounts._check_cname()
 
     @classmethod
-    def _check_txt(cls, accdata:dict, dns_resolver:dns.resolver.Resolver, resolve_func) -> typing.Tuple[bool,str]:
+    def _check_txt(cls, accdata:dict, resolve_func:typing.Callable[...,dns.resolver.Answer]) -> typing.Tuple[bool,str]:
         try:
             ### https://dnspython.readthedocs.io/en/stable/resolver-class.html#dns.resolver.Resolver.resolve
             dns_answers = resolve_func(qname=accdata[cls.ATTR_DOMAIN_CHALLENGE], rdtype=dns.rdatatype.TXT)
@@ -671,7 +818,7 @@ class DomainAccounts:
             return False, "TXT missing (acme-dns: either DNS (NS, A/AAAA or glue record) or setup (domain not updated once yet? deregistered?)"
 
         return True, "TXT available (acme-dns)"
-    # --- /DomainAccounts.check()
+    # --- /DomainAccounts._check_txt()
 
     @classmethod
     def check(cls, accdata:dict, nameservers:list) -> typing.Tuple[bool,str]:
@@ -690,12 +837,12 @@ class DomainAccounts:
         sep = ", "
 
         ### check CNAME record of challenge domain
-        subresult = cls._check_cname(accdata, dns_resolver, resolve_func)
+        subresult = cls._check_cname(accdata=accdata, resolve_func=resolve_func)
         message = subresult[1]
 
         if subresult[0]:
             ### check TXT record for challenge domain
-            subresult = cls._check_txt(accdata, dns_resolver, resolve_func)
+            subresult = cls._check_txt(accdata=accdata, resolve_func=resolve_func)
             message = sep.join((message, subresult[1]))
 
         ### final result

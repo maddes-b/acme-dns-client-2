@@ -7,12 +7,12 @@
 
 == Features
 
-* Manage https://github.com/joohoi/acme-dns[acme-dns] (https://github.com/acme-dns/acme-dns[[2\]]) domain registrations and txt record updates with ease
+* Manage https://github.com/joohoi/acme-dns[acme-dns] (https://github.com/acme-dns/acme-dns[[2\]]) domain registrations and TXT record updates with ease
 * Supports https://certbot.eff.org/[certbot]
 * Supports https://github.com/acmesh-official/acme.sh[acme.sh]
 * One configuration for all: command line, certbot, acme.sh, etc.
 ** Allows switching between Let's Encrypt clients (certbot, acme.sh) without reconfiguration
-* All details of each registration is kept in files to reduce command line parameters and support multiple acme-dns server instances
+* All details of each domain registration is kept in a file to reduce command line parameters and to support multiple acme-dns server instances
 * Scripts only: Python 3.5+ with wrapper shell script (POSIX compatible) for handling Python Virtual Environment
 ////
 * Prepared for future acme-dns functionalities
@@ -37,8 +37,8 @@ Debian/Ubuntu: `apt install python3 python3-venv`
 Download {url-project}[acme-dns-client-2] and extract it to a temporary directory.
 Or directly `git clone` it to a temporary directory. +
 Make `install.sh` executable.
-Run it to install acme-dns-client-2 to `${PREFIX]/usr/local/bin`. `${PREFIX]` is useful for package maintainers of Linux distros. +
-It will also create an initial configuration file and initial domain accounts file in `${PREFIX]/etc/acme-dns-client`.
+Run it to install acme-dns-client-2 to `${PREFIX}/usr/local/bin`. `${PREFIX}` is useful for package maintainers of Linux distros. +
+It will also create an initial configuration file and initial domain accounts file in `${PREFIX}/etc/acme-dns-client`.
 ```
 chmod u+x install.sh
 PREFIX='' ./install.sh
@@ -73,6 +73,7 @@ options:
 
 commands:
   command              Use `<command> --help` for details
+    accounts-upgrade   upgrade domain accounts file (add default data)
     add                add an already registered domain (to client only)
     certbot            run as manual-auth-hook with certbot
     check              check DNS setup of a registered domain
@@ -231,8 +232,9 @@ Do not post any output/log where this option was enabled.
 == Alternative Clients
 
 * https://github.com/acme-dns/acme-dns-client[acme-dns-client] by joohoi (written in Go)
-** Similar domain accounts file `/etc/letsencrypt/acmedns.json`, which can be directly used with acme-dns-client-2 (either copy or use `--accounts`).
+** Similar domain accounts file `/etc/acmedns/clientstorage.json`, which can be directly used with acme-dns-client-2 (either copy or use `--accounts`).
 * Coding example only! https://github.com/joohoi/acme-dns-certbot-joohoi[acme-dns-certbot] by joohoi (written in Python)
 ** This was the reason acme-dns-client-2 was created.
+** Similar domain accounts file `/etc/letsencrypt/acmedns.json`, which can be directly used with acme-dns-client-2 (either copy or use `--accounts`).
 * https://github.com/acmesh-official/acme.sh/blob/master/dnsapi/dns_acmedns.sh[dns_acmedns.sh] (https://github.com/dampfklon/acme.sh[[2\]]) (acme.sh shell script)
 ** only works for certificates with a single domain (normal and/or wildcard).
