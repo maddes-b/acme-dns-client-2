@@ -1,12 +1,13 @@
-= acme-dns-client-2
+= {url-project}[acme-dns-client-2]
 :author: Matthias "Maddes" Bücher
+:url-project: https://github.com/maddes-b/acme-dns-client-2
 :url-maddes: https://www.maddes.net/
 :toc:
 
 
 == Features
 
-* Manage acme-dns domain registrations and txt record updates with ease
+* Manage https://github.com/joohoi/acme-dns[acme-dns] (https://github.com/acme-dns/acme-dns[[2\]]) domain registrations and txt record updates with ease
 * Supports https://certbot.eff.org/[certbot]
 * Supports https://github.com/acmesh-official/acme.sh[acme.sh]
 * One configuration for all: command line, certbot, acme.sh, etc.
@@ -23,6 +24,8 @@
 
 == Installation
 
+Project page: {url-project}
+
 === Prerequisites
 
 Install Python 3 (3.5+) and Virtual Environment support via venv.
@@ -31,7 +34,7 @@ Debian/Ubuntu: `apt install python3 python3-venv`
 
 === acme-dns-client-2
 
-Download acme-dns-client-2 and extract it to a temporary directory.
+Download {url-project}[acme-dns-client-2] and extract it to a temporary directory.
 Or directly `git clone` it to a temporary directory. +
 Make `install.sh` executable.
 Run it to install acme-dns-client-2 to `${PREFIX]/usr/local/bin`. `${PREFIX]` is useful for package maintainers of Linux distros. +
@@ -223,3 +226,13 @@ acme.sh --deactivate [--server letsencrypt_test] -d 'test.example.com' -d '*.tes
 Enabling debug output can be done via `--debug 1`. Levels 2 and 3 are even more verbose. Use `--debug 2` for bug reports. +
 Warning! Using `--output-insecure` is only recommended for private tests.
 Do not post any output/log where this option was enabled.
+
+
+== Alternative Clients
+
+* https://github.com/acme-dns/acme-dns-client[acme-dns-client] by joohoi (written in Go)
+** Similar domain accounts file `/etc/letsencrypt/acmedns.json`, which can be directly used with acme-dns-client-2 (either copy or use `--accounts`).
+* Coding example only! https://github.com/joohoi/acme-dns-certbot-joohoi[acme-dns-certbot] by joohoi (written in Python)
+** This was the reason acme-dns-client-2 was created.
+* https://github.com/acmesh-official/acme.sh/blob/master/dnsapi/dns_acmedns.sh[dns_acmedns.sh] (https://github.com/dampfklon/acme.sh[[2\]]) (acme.sh shell script)
+** only works for certificates with a single domain (normal and/or wildcard).
