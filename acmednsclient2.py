@@ -2,7 +2,7 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: nil; py-indent-offset: 4 -*-
 
 """
-Module for acme-dns Clients
+Module for acme-dns Clients to handle configuration and domain accounts incl. server API
 
 License: GPLv2 - https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -13,10 +13,9 @@ Targeted Python Version: 3.5 (Debian 9 "Stretch"), taking Python 3.12 into accou
 Authors:
 - Matthias "Maddes" Bücher <maddes@maddes.net>
 """
-### TODO: complete docstrings
 
 
-__version__ = "0.10.0"
+__version__ = "0.10.1-beta"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
@@ -57,7 +56,7 @@ del JSON5_TEST, RESULT
 ### ----------------------------------------
 class Configuration:
     """
-    Handles configuration for acme-dns-client-2
+    Handles configuration for acme-dns clients
 
     Defines default configuration and loads settings from a JSON configuration file.
     Configuration is kept in dictionary `.settings`.
@@ -116,8 +115,8 @@ class Configuration:
 
     def __init__(self, configpath:str, accountspath:typing.Union[str,None]=None) -> None:
         """
-        Stores given arguments separately to rebuild defaults at any time.
-        Creates dictionary for configuration settings and loads further configuration from the given JSON file.
+        Constructor stores given arguments separately to rebuild defaults at any time.
+        Creates ordered dictionary for configuration settings and loads further configuration from the given JSON file.
         """
 
         ### keep given arguments separately
@@ -127,7 +126,7 @@ class Configuration:
         ### create dictionary for settings
         self.settings = collections.OrderedDict()
 
-        ### load configuration from JSON file if available, sets defaults first
+        ### load configuration from JSON file, sets defaults first
         self._loadFromFile()
     # --- /Configuration.__init__()
 
@@ -155,26 +154,20 @@ class Configuration:
     def _loadFromFile(self) -> None:
         """
         First initializes configuration with defaults.
-        Then loads configuration from JSON file if available.
+        Then loads configuration from JSON file.
+        Additional unknown settings of JSON file are ignored.
 
         Special configuration settings CANNOT be overwritten by the configuration file:
         - the configuration file path itself
-        - the domains accounts file path if given explicitly on class object instantiation
-
-        Additional unknown settings are kept to avoid issues with other client implementations and/or other versions.
+        - the domain accounts file path, if given explicitly on class object instantiation
         """
 
         ### clear configuration and set defaults
         self._resetWithDefaults()
 
-        ### check if JSON file exists
-        if not os.path.exists(self._jsonpath):
-            # TODO: Error out, as normally created via install.sh?
-            return
-
         filedata = None
-        with open(self._jsonpath, mode="r") as fd:
-            filedata = json.load(fd)
+        with open(self._jsonpath, mode="rt") as file:
+            filedata = json.load(file)
 
         for key, fileconfigdata in filedata.items():
             ### do not overwrite some specific keys
@@ -198,9 +191,13 @@ class Configuration:
 ### ----------------------------------------
 class DomainAccounts:
     """
-    key = to be authorized target domain
-    (full|sub)domain = CNAMEd acme-dns domain
-    server_url = base URL of acme-dns API
+    Handles domain accounts for acme-dns clients
+
+    Defines an ordered dictionary and load domain accounts from a JSON file.
+    As domain key the domain name of the  to be authorized target domain is used.
+
+    Provides constants (all uppercase) for default values plus attribute names of settings.
+    Use `ATTR_...` constants to access each domain account field.
     """
 
     ### attributes of API
@@ -233,7 +230,7 @@ class DomainAccounts:
 
     def __init__(self, config:Configuration) -> None:
         """
-        Creates dictionary for domain acounts and loads accounts from the given JSON file.
+        Constructor creates ordered dictionary for domain acounts and loads accounts from the configured JSON file.
         """
 
         ### keep given arguments separately
@@ -242,27 +239,26 @@ class DomainAccounts:
         ### create dictionary for domain accounts
         self.domains = collections.OrderedDict()
 
-        ### load from domain accounts file if available
+        ### load from domain accounts file
         self._loadFromFile(config=config)
     # --- /DomainAccounts.__init__()
 
     def _loadFromFile(self, config:Configuration) -> None:
         """
         First clears domain accounts.
-        Then loads account domains from JSON file if available.
+        Then loads domain accounts from JSON file sorted by domain name.
 
-        Additional unknown data entries are kept to avoid issues with other client implementations and/or other versions.
+        If data is missing for a domain account, then it is enhanced with the configured defaults.
+        This can happen if the domain accounts are from an older version or other client.
+
+        Additional unknown data entries are kept to avoid issues with other versions and/or other client implementations.
         """
 
         self.domains.clear()
 
-        if not os.path.exists(self._jsonpath):
-            # TODO: Error out, as normally created via install.sh?
-            return
-
         filedata = None
-        with open(self._jsonpath, mode="r") as fd:
-            filedata = json.load(fd)
+        with open(self._jsonpath, mode="rt") as file:
+            filedata = json.load(file)
 
         default_server = config.settings[config.ATTR_URL_DEFAULT_SERVER]
         for key, fileaccdata in sorted(filedata.items()):
@@ -334,7 +330,7 @@ class DomainAccounts:
     @classmethod
     def sanitizeDomain(cls, key:str) -> str:
         """
-        Removes unwanted prefixes, until all removed and the normal domain is left:
+        Removes unwanted prefixes until all are removed and the normal domain is left:
         - '*.' from wildcard certificate domains
         - '_acme-challenge.' from challenge domains
 
@@ -356,9 +352,9 @@ class DomainAccounts:
     @classmethod
     def _enhanceEntry(cls, key:str, accdata:dict) -> None:
         """
-        Enhance a domain account with additional data for processing and display.
+        Enhance domain account with additional data for processing and display.
+        - domain name as 'key' of domain account
         - DNS related data (CNAME entry and its components)
-        - Domain as key of domain account
 
         DO NOT use for account data that will be saved to domain accounts file.
         """
@@ -371,7 +367,7 @@ class DomainAccounts:
     @classmethod
     def _determineRelatedDomains(cls, accdata:dict) -> dict:
         """
-        Determines DNS related data for a domain and returns them as a dictionary.
+        Determines DNS related data for domain account and returns them as a dictionary.
         """
 
         result = collections.OrderedDict()
@@ -384,29 +380,25 @@ class DomainAccounts:
 
     def save(self) -> None:
         """
-        Save domains accounts to JSON file.
-
-        Directory and file are created if they do not exist
+        Save domain accounts to JSON file sorted by domain name.
         """
 
-        ### Check directory and create it if it doesn't exist
-        jsondir = os.path.dirname(self._jsonpath)
-        if not os.path.exists(jsondir):
-            os.makedirs(jsondir, mode=0o0777, exist_ok=False)
-
-        ### sort accounts on domain key for saving
+        ### sort accounts by domain name for saving
         filedata = collections.OrderedDict()
         for key, accdata in sorted(self.domains.items()):
             filedata[key] = accdata
 
-        ### write sorted domain accounts
-        with os.fdopen(os.open(self._jsonpath, flags=os.O_WRONLY|os.O_TRUNC|os.O_CREAT, mode=0o0600), mode="w") as fd:
-            json.dump(filedata, fd, indent=4, **JSON5_DUMP_KWARGS)
+        ### convert sorted domain accounts to JSON string
+        filedata = json.dumps(filedata, indent=4, **JSON5_DUMP_KWARGS)
+
+        ### write JSON string
+        with open(self._jsonpath, mode="wt") as file:
+            file.write(filedata)
     # --- /DomainAccounts.save()
 
     def get(self, key:str) -> typing.Union[dict,None]:
         """
-        Gets domain account data for a domain key.
+        Gets domain account for a domain key.
 
         Result is enhanced with additional data for processing and display.
         DO NOT use for account data that will be saved to domain accounts file.
@@ -432,11 +424,14 @@ class DomainAccounts:
             server_path_update:str,
             allowfrom:typing.Union[list,None]=None) -> typing.Union[dict,None]:
         """
-        Adds domain account data for a domain key.
-        The domain key is sanitized down to the base domain.
-        Only one domain account is needed for normal and wildcard certificate entries.
-
+        Adds domain account for domain key.
+        The domain key is sanitized down to the normal domain.
         Useful to add already existing domain registration from another client and/or machine.
+
+        Result is enhanced with additional data for processing and display.
+        DO NOT use result for account data that will be saved to domain accounts file.
+
+        Only one domain account is needed for normal and wildcard certificate entries.
         """
 
         key = self.sanitizeDomain(key=key)
@@ -474,6 +469,10 @@ class DomainAccounts:
     # --- /DomainAccounts.add()
 
     def remove(self, key:str) -> bool:
+        """
+        Removes domain account for a domain key.
+        """
+
         try:
             del self.domains[key]
         except KeyError as e:
@@ -482,29 +481,37 @@ class DomainAccounts:
         return True
     # --- /DomainAccounts.remove()
 
-    def rename(self, key_from:str, key_to:str) -> typing.Union[dict,None]:
+    def rename(self, key_from:str, key_to:str) -> typing.Tuple[typing.Union[dict,None],str]:
         """
-        Rename domain key for a domain account.
-        WARNING! Overwrites existing target domain if available.
+        Renames domain key for a domain account.
 
         Result is enhanced with additional data for processing and display.
-        DO NOT use for account data that will be saved to domain accounts file.
+        DO NOT use result for account data that will be saved to domain accounts file.
         """
+
+        if key_to in self.domains:
+            return None, "Domain account for \"{domain:s}\" already exists".format(domain=key_to)
 
         try:
             accdata = collections.OrderedDict(self.domains[key_from])
-            self.domains[key_to] = collections.OrderedDict(accdata)
-            del self.domains[key_from]
         except KeyError as e:
-            return None
+            return None, "Domain account for \"{domain:s}\" does not exist".format(domain=key_from)
+
+        self.domains[key_to] = collections.OrderedDict(accdata)
+        del self.domains[key_from]
 
         self._enhanceEntry(key=key_to, accdata=accdata)
 
-        return accdata
+        return accdata, "Domain renamed"
     # --- /DomainAccounts.get()
 
     @classmethod
     def _setApiHeaders(cls, accdata:typing.Union[dict,None]) -> dict:
+        """
+        Creates HTTP headers for acme-dns server API.
+        If account data is present, then header entries for username and password will be created.
+        """
+
         api_headers = {}
         api_headers["Content-Type"] = "application/json; charset=utf8"
 
@@ -517,6 +524,11 @@ class DomainAccounts:
 
     @classmethod
     def _setApiData(cls, accdata:typing.Union[dict,None]) -> dict:
+        """
+        Creates HTTP POST data for acme-dns server API.
+        If account data is present, then entry for subdomain will be created.
+        """
+
         api_data = {}
 
         if accdata:
@@ -533,10 +545,20 @@ class DomainAccounts:
                  server_path_register:str,
                  server_path_update:str,
                  allowfrom:typing.Union[list,None]=None) -> typing.Tuple[typing.Union[dict,None],str,int]:
+        """
+        Registers a new domain account for domain key via acme-dns server API.
+        The domain key is sanitized down to the normal domain.
+
+        Result is enhanced with additional data for processing and display.
+        DO NOT use result for account data that will be saved to domain accounts file.
+
+        Only one domain account is needed for normal and wildcard certificate entries.
+        """
+
         key = self.sanitizeDomain(key=key)
 
         if key in self.domains:
-            return None, "Domain account data already exist", -1
+            return None, "Domain account for \"{domain:s}\" already exists".format(domain=key), -1
 
         request_headers = self._setApiHeaders(accdata=None)
 
@@ -615,6 +637,12 @@ class DomainAccounts:
 
     @classmethod
     def update(cls, accdata:dict, token:str) -> typing.Tuple[bool,str,int]:
+        """
+        Updates challenge token for domain account on the related acme-dns server with given token.
+
+        acme-dns server holds two (2) rolling TXT challenge tokens, so no need to clean up TXT records.
+        """
+
         if not accdata:
             return False, "Missing domain account data", -1
 
@@ -652,6 +680,11 @@ class DomainAccounts:
 
     @classmethod
     def deregister(cls, accdata:dict) -> typing.Tuple[bool,str,int]:
+        """
+        [FUTURE] possible functionality
+        Deregisters domain account on the related acme-dns server.
+        """
+
         if not accdata:
             return False, "Missing domain account data", -1
 
@@ -674,14 +707,11 @@ class DomainAccounts:
         if request_response.status_code != requests.codes.OK:
             message = "{code:d} Error: \"{reason:s}\" for URL \"{url}\"".format(code=request_response.status_code, reason=request_response.reason, url=request_response.url)
             #
-            if request_response.status_code == requests.codes.NOT_FOUND:
-                text = "NOT SUPPORTED by server. OK."
-            else:
-                try:
-                    text = request_response.json()
-                    text = json.dumps(text, indent=4, **JSON5_DUMP_KWARGS)
-                except requests.JSONDecodeError as e:
-                    text = request_response.text.rstrip("\n")
+            try:
+                text = request_response.json()
+                text = json.dumps(text, indent=4, **JSON5_DUMP_KWARGS)
+            except requests.JSONDecodeError as e:
+                text = request_response.text.rstrip("\n")
             message = "\n".join((message, text))
             #
             return False, message, request_response.status_code
@@ -691,6 +721,11 @@ class DomainAccounts:
 
     @classmethod
     def clean(cls, accdata:dict, token:str) -> typing.Tuple[bool,str,int]:
+        """
+        [FUTURE] possible functionality
+        Cleans challenge token for domain account on the related acme-dns server.
+        """
+
         if not accdata:
             return False, "Missing domain account data", -1
 
@@ -714,14 +749,11 @@ class DomainAccounts:
         if request_response.status_code != requests.codes.OK:
             message = "{code:d} Error: \"{reason:s}\" for URL \"{url}\"".format(code=request_response.status_code, reason=request_response.reason, url=request_response.url)
             #
-            if request_response.status_code == requests.codes.NOT_FOUND:
-                text = "NOT SUPPORTED by server. OK."
-            else:
-                try:
-                    text = request_response.json()
-                    text = json.dumps(text, indent=4, **JSON5_DUMP_KWARGS)
-                except requests.JSONDecodeError as e:
-                    text = request_response.text.rstrip("\n")
+            try:
+                text = request_response.json()
+                text = json.dumps(text, indent=4, **JSON5_DUMP_KWARGS)
+            except requests.JSONDecodeError as e:
+                text = request_response.text.rstrip("\n")
             message = "\n".join((message, text))
             #
             return False, message, request_response.status_code
@@ -729,17 +761,34 @@ class DomainAccounts:
         return True, message, request_response.status_code
     # --- /DomainAccounts.clean()
 
-    def change(self, accdata:dict, allowfrom:typing.Union[list,None]) -> typing.Tuple[typing.Union[dict,None],str,int]:
+    def change(self, accdata:dict, allowfrom:typing.Union[list,None]=None) -> typing.Tuple[typing.Union[dict,None],str,int]:
+        """
+        [FUTURE] possible functionality
+        Changes domain account data on the related acme-dns server.
+
+        Change values of None are not send to the server and therefore not changed.
+        e.g. if "allowfrom" shall be cleared out, then set an empty list []
+
+        Result is enhanced with additional data for processing and display.
+        DO NOT use result for account data that will be saved to domain accounts file.
+        """
+
         if not accdata:
             return None, "Missing domain account data", -1
 
         request_headers = self._setApiHeaders(accdata=accdata)
 
         request_data = self._setApiData(accdata=accdata)
-        if allowfrom:
+
+        ### set to be changed fields
+        Change = False
+
+        if allowfrom is not None:
             request_data[self.ATTR_ALLOW_FROM] = allowfrom
-        else:
-            request_data[self.ATTR_ALLOW_FROM] = None ### explicit clear
+            Change = True
+
+        if not Change:
+            return None, "Nothing to change", 0
 
         ### convert request data into JSON format; post() json parameter = requests 2.4.2+
         request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
@@ -756,14 +805,11 @@ class DomainAccounts:
         if request_response.status_code != requests.codes.OK:
             message = "{code:d} Error: \"{reason:s}\" for URL \"{url}\"".format(code=request_response.status_code, reason=request_response.reason, url=request_response.url)
             #
-            if request_response.status_code == requests.codes.NOT_FOUND:
-                text = "NOT SUPPORTED by server. OK."
-            else:
-                try:
-                    text = request_response.json()
-                    text = json.dumps(text, indent=4, **JSON5_DUMP_KWARGS)
-                except requests.JSONDecodeError as e:
-                    text = request_response.text.rstrip("\n")
+            try:
+                text = request_response.json()
+                text = json.dumps(text, indent=4, **JSON5_DUMP_KWARGS)
+            except requests.JSONDecodeError as e:
+                text = request_response.text.rstrip("\n")
             message = "\n".join((message, text))
             #
             return None, message, request_response.status_code
@@ -822,6 +868,12 @@ class DomainAccounts:
 
     @classmethod
     def check(cls, accdata:dict, nameservers:list) -> typing.Tuple[bool,str]:
+        """
+        Checks DNS setup for domain account
+        - correct CNAME entry of challenge domain to acme-dns fulldomain
+        - TXT records are served for the challenge domain
+        """
+
         if not accdata:
             return False, "Missing domain account data"
 

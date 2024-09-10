@@ -7,13 +7,19 @@
 
 == Features
 
-* Manage https://github.com/joohoi/acme-dns[acme-dns] (https://github.com/acme-dns/acme-dns[[2\]]) domain registrations and TXT record updates with ease
-* Supports https://certbot.eff.org/[certbot]
-* Supports https://github.com/acmesh-official/acme.sh[acme.sh]
-* One configuration for all: command line, certbot, acme.sh, etc.
-** Allows switching between Let's Encrypt clients (certbot, acme.sh) without reconfiguration
-* All details of each domain registration is kept in a file to reduce command line parameters and to support multiple acme-dns server instances
-* Scripts only: Python 3.5+ with wrapper shell script (POSIX compatible) for handling Python Virtual Environment
+* Manage https://github.com/joohoi/acme-dns[acme-dns] (https://github.com/acme-dns/acme-dns[alternative]) domain registrations and TXT record updates with ease.
+* Supports ACME clients https://certbot.eff.org/[certbot] (Let's Encrypt only) and https://github.com/acmesh-official/acme.sh[acme.sh]. Maybe also other ACME clients.
+* All details of the domain registrations are kept in a domain accounts file to reduce command line parameters and to support multiple acme-dns server instances.
+** Add existing domain registrations.
+** Supports custom API paths, e.g. for reverse proxied API.
+** Rename domains to re-use domain registrations.
+* One setup for all: command line, certbot, acme.sh, etc.
+** Allows switching between ACME clients without reconfiguration.
+** JSON in human-readable format for manual maintenance (not recommended for domain accounts file).
+* Supports multiple configuration setups if needed.
+* Provides check for DNS and acme-dns working.
+* Provides dummy token to test token update.
+* Scripts only: Python 3.5+ with wrapper shell script (POSIX compatible) for handling Python Virtual Environment.
 ////
 * Prepared for future acme-dns functionalities
 ** deregister a domain
@@ -56,10 +62,6 @@ Always execute `acme-dns-client-2.sh`.
 It is a wrapper shell script to create and activate the required Python Virtual Environment. +
 When executed without any arguments it will display the main help with the possible commands.
 
-==== For developers/admins
-`acme-dns-client-2.py` can be run directly but the required modules must be available either from the system or an activated Python Virtual Environment.
-That allows to debug the Python script with an IDE.
-
 === Commands List
 
 ```
@@ -101,6 +103,11 @@ The following can be configured in JSON syntax:
 * `default_server` (string) - defines a default server to use for `add/register` command. +
 Useful if mainly a single acme-dns server is used.
 Still another acme-dns server can be specified via `--server`.
+** `default_server_path_change` (string) - custom URL path to change a domain account, defaults to `/change`.
+** `default_server_path_clean` (string) - custom URL path to clean a TXT/token record, defaults to `/clean`.
+** `default_server_path_deregister` (string) - custom URL path to deregister a domain account, defaults to `/deregister`.
+** `default_server_path_register` (string) - custom URL path to register a new domain account, defaults to `/register`.
+** `default_server_path_update` (string) - custom URL path to update TXT/token for a challenge, defaults to `/update`.
 * `nameservers` (list of strings) - define different name servers to do DNS lookups via their IPs.
 * `accountspath` (string) - defines a different domain accounts file. Professional use only.
 
@@ -127,7 +134,7 @@ Warning! This will lead to a new DNS setup, that will break other setups.
 
 A single registration is needed for normal and wildcard certificate entries of a domain, e.g. `test.example.com` is also valid for `*.test.example.com`.
 
-Note: `--server` can be omitted if `default_server` is defined in configuration and fits the domain registration.
+Note: `--server` can be omitted if `default_server` is defined in configuration and shall be used for the domain registration.
 
 ==== Register a new domain
 
@@ -207,7 +214,21 @@ acme.sh --revoke [--server letsencrypt_test] -d 'test.example.com'
 https://wiki.acme.sh/[acme.sh Documentation Wiki]
 
 
+== Miscellaneous
+
+=== Performance
+If performance is highly important for whatever reason, then check out the SPEEDUP marks in the scripts.
+Normally performance should not matter for retrieving and renewing certificates.
+
+=== Bugs, Pull Requests, Ideas
+If there any issues or ideas, then just create an issue on the project page.
+
+
 == Development & Testing
+
+=== Execution
+`acme-dns-client-2.py` can be run directly but the required modules must be available either from the system or an activated Python Virtual Environment.
+That allows to debug the Python script within an IDE, e.g. VS Code in WSL.
 
 === certbot Testing
 
@@ -236,5 +257,5 @@ Do not post any output/log where this option was enabled.
 * Coding example only! https://github.com/joohoi/acme-dns-certbot-joohoi[acme-dns-certbot] by joohoi (written in Python)
 ** This was the reason acme-dns-client-2 was created.
 ** Similar domain accounts file `/etc/letsencrypt/acmedns.json`, which can be directly used with acme-dns-client-2 (either copy or use `--accounts`).
-* https://github.com/acmesh-official/acme.sh/blob/master/dnsapi/dns_acmedns.sh[dns_acmedns.sh] (https://github.com/dampfklon/acme.sh[[2\]]) (acme.sh shell script)
+* https://github.com/acmesh-official/acme.sh/blob/master/dnsapi/dns_acmedns.sh[dns_acmedns.sh] (https://github.com/dampfklon/acme.sh[alternative]) (acme.sh shell script)
 ** only works for certificates with a single domain (normal and/or wildcard).

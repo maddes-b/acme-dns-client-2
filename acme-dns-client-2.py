@@ -4,7 +4,7 @@
 
 """
 acme-dns-client-2 for acme-dns servers - normally executed via related .sh file (due to Virtual Enviroment with required modules)
-- the client script can be used directly to register a domains, check the DNS
+- the client script can be used directly to register a domain, check the DNS
   and acme-dns setup, and more. Execute with `[command] --help` for more details.
 - default configuration can be displayed via `config` command
 - the client script can be used as a manual authorization hook for dns-01
@@ -18,10 +18,9 @@ Targeted Python Version: 3.5 (Debian 9 "Stretch"), taking Python 3.12 into accou
 Authors:
 - Matthias "Maddes" Bücher <maddes@maddes.net>
 """
-### TODO: complete docstrings
 
 
-__version__ = "0.10.0"
+__version__ = "0.10.1-beta"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
@@ -450,25 +449,34 @@ if __name__ == "__main__":
             else:
                 Message = Text
 
-        if not Arguments.force \
-        and New in Accounts.domains:
-            Error = True
-            Text = "New domain \"{domain:s}\" already exists".format(domain=New)
-            #
-            if Message:
-                Message = "\n".join((Message, Text))
-            else:
-                Message = Text
+
+        if Arguments.force:
+            Accounts.remove(key=New)
+        else:
+            Data = Accounts.get(key=New)
+            if Data:
+                Error = True
+                Text = "New domain \"{domain:s}\" already exists".format(domain=New)
+                #
+                if Message:
+                    Message = "\n".join((Message, Text))
+                else:
+                    Message = Text
+                #
+                if Arguments.verbose >= 1:
+                    Text = json.dumps(Data, indent=4)
+                    Message = "\n".join((Message, Text))
 
         if Error:
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
             print("{message:s}".format(message=Message), file=sys.stderr)
             sys.exit(1)
 
-        Data = Accounts.rename(key_from=Key, key_to=New)
-        if not Data:
+        result = Accounts.rename(key_from=Key, key_to=New)
+        if not result[0]:
             print("Data from {path:s}".format(path=Config.settings[Config.ATTR_PATH_ACCOUNTS]), file=sys.stderr)
             print("Domain \"{domain:s}\" could not be renamed".format(domain=Key), file=sys.stderr)
+            print("{message:s}".format(message=result[1]), file=sys.stderr)
             sys.exit(1)
 
         Accounts.save()
