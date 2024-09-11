@@ -1,5 +1,7 @@
 #!/bin/sh -eu
 
+SCRIPT_DIR="$(dirname "${0}")"
+
 ### Setup etc dir
 ETCDIR="${PREFIX:-}/etc/acme-dns-client"
 #
@@ -29,6 +31,6 @@ BINDIR="${PREFIX:-}/usr/local/bin"
 #
 [ -d "${BINDIR}" ] || install -v -d -- "${BINDIR}"
 #
-install -v -- acme-dns-client-2.sh "${BINDIR}/"
-install -v -- acme-dns-client-2.py "${BINDIR}/"
-install -v -m u=rw-s,go=r-s -- acmednsclient2.py "${BINDIR}/"
+install -v -- "${SCRIPT_DIR}/acme-dns-client-2.sh" "${BINDIR}/"
+install -v -- "${SCRIPT_DIR}/acme-dns-client-2.py" "${BINDIR}/"
+install -v -m u=rw-s,go=r-s -- "${SCRIPT_DIR}/acmednsclient2.py" "${BINDIR}/"

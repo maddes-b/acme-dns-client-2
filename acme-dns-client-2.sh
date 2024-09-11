@@ -6,7 +6,7 @@
 ### - the shell part creates and activates a fitting Python Virtual Environment
 ###   to not mess up the system's Python environment
 ### - the Python script implements the program logic
-### - the client script can be used directly to register a domains, check the DNS
+### - the client script can be used directly to register a domain, check the DNS
 ###   and acme-dns setup, and more. Execute with `[command] --help` for more details.
 ### - default configuration can be displayed via `config` command
 ### - the client script can be used as a manual authorization hook for dns-01
