@@ -103,11 +103,11 @@ The following can be configured in JSON syntax:
 * `default_server` (string) - defines a default server to use for `add/register` command. +
 Useful if mainly a single acme-dns server is used.
 Still another acme-dns server can be specified via `--server`.
-** `default_server_path_change` (string) - custom URL path to change a domain account, defaults to `/change`.
-** `default_server_path_clean` (string) - custom URL path to clean a TXT/token record, defaults to `/clean`.
-** `default_server_path_deregister` (string) - custom URL path to deregister a domain account, defaults to `/deregister`.
-** `default_server_path_register` (string) - custom URL path to register a new domain account, defaults to `/register`.
-** `default_server_path_update` (string) - custom URL path to update TXT/token for a challenge, defaults to `/update`.
+** `default_server_path_change` (string) - custom URL path to change a domain account, defaults to `change`.
+** `default_server_path_clean` (string) - custom URL path to clean a TXT/token record, defaults to `clean`.
+** `default_server_path_deregister` (string) - custom URL path to deregister a domain account, defaults to `deregister`.
+** `default_server_path_register` (string) - custom URL path to register a new domain account, defaults to `register`.
+** `default_server_path_update` (string) - custom URL path to update TXT/token for a challenge, defaults to `update`.
 * `nameservers` (list of strings) - define different name servers to do DNS lookups via their IPs.
 * `accountspath` (string) - defines a different domain accounts file. Professional use only.
 

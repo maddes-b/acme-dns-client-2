@@ -15,7 +15,7 @@ Authors:
 """
 
 
-__version__ = "0.10.1"
+__version__ = "0.10.2"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
@@ -96,11 +96,11 @@ class Configuration:
         #"2620:119:53::53",
         #"208.67.220.220",
     )
-    DEFAULT_URL_PATH_CHANGE = "/change"
-    DEFAULT_URL_PATH_CLEAN = "/clean"
-    DEFAULT_URL_PATH_DEREGISTER = "/deregister"
-    DEFAULT_URL_PATH_REGISTER = "/register"
-    DEFAULT_URL_PATH_UPDATE = "/update"
+    DEFAULT_URL_PATH_CHANGE = "change"
+    DEFAULT_URL_PATH_CLEAN = "clean"
+    DEFAULT_URL_PATH_DEREGISTER = "deregister"
+    DEFAULT_URL_PATH_REGISTER = "register"
+    DEFAULT_URL_PATH_UPDATE = "update"
 
     ### Constants of setting attribute names in configuration
     ATTR_PATH_CONFIG = "configpath"
@@ -177,7 +177,13 @@ class Configuration:
             and self._accountspath is not None:
                 continue
 
+            ### overwrite if known setting
             if key in self.settings:
+                ### special cases
+                if key == self.ATTR_URL_DEFAULT_SERVER:
+                    if fileconfigdata and not fileconfigdata.endswith("/"):
+                        fileconfigdata = "/".join((fileconfigdata, ""))
+
                 self.settings[key] = fileconfigdata
     # --- /Configuration._loadFromFile()
 
@@ -268,48 +274,55 @@ class DomainAccounts:
             accdata[self.ATTR_SUBDOMAIN] = fileaccdata.pop(self.ATTR_SUBDOMAIN)
             accdata[self.ATTR_USERNAME] = fileaccdata.pop(self.ATTR_USERNAME)
             accdata[self.ATTR_PASSWORD] = fileaccdata.pop(self.ATTR_PASSWORD)
-            server = fileaccdata.pop(self.ATTR_SERVER_URL)
-            accdata[self.ATTR_SERVER_URL] = server
+            server_url = fileaccdata.pop(self.ATTR_SERVER_URL)
+            if server_url and not server_url.endswith("/"):
+                server_url = "/".join((server_url, ""))
+            accdata[self.ATTR_SERVER_URL] = server_url
             #
             try:
-                accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_CHANGE)
+                path = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_CHANGE)
             except KeyError as e:
-                if server == default_server:
-                    accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = config.settings[config.ATTR_URL_DEFAULT_PATH_CHANGE]
+                if server_url == default_server:
+                    path = config.settings[config.ATTR_URL_DEFAULT_PATH_CHANGE]
                 else:
-                    accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = config.DEFAULT_URL_PATH_CHANGE
+                    path = config.DEFAULT_URL_PATH_CHANGE
+            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = path.lstrip("/")
             #
             try:
-                accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_CLEAN)
+                path = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_CLEAN)
             except KeyError as e:
-                if server == default_server:
-                    accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = config.settings[config.ATTR_URL_DEFAULT_PATH_CLEAN]
+                if server_url == default_server:
+                    path = config.settings[config.ATTR_URL_DEFAULT_PATH_CLEAN]
                 else:
-                    accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = config.DEFAULT_URL_PATH_CLEAN
+                    path = config.DEFAULT_URL_PATH_CLEAN
+            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = path.lstrip("/")
             #
             try:
-                accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_DEREGISTER)
+                path = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_DEREGISTER)
             except KeyError as e:
-                if server == default_server:
-                    accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = config.settings[config.ATTR_URL_DEFAULT_PATH_DEREGISTER]
+                if server_url == default_server:
+                    path = config.settings[config.ATTR_URL_DEFAULT_PATH_DEREGISTER]
                 else:
-                    accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = config.DEFAULT_URL_PATH_DEREGISTER
+                    path = config.DEFAULT_URL_PATH_DEREGISTER
+            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = path.lstrip("/")
             #
             try:
-                accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_REGISTER)
+                path = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_REGISTER)
             except KeyError as e:
-                if server == default_server:
-                    accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = config.settings[config.ATTR_URL_DEFAULT_PATH_REGISTER]
+                if server_url == default_server:
+                    path = config.settings[config.ATTR_URL_DEFAULT_PATH_REGISTER]
                 else:
-                    accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = config.DEFAULT_URL_PATH_REGISTER
+                    path = config.DEFAULT_URL_PATH_REGISTER
+            accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = path.lstrip("/")
             #
             try:
-                accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_UPDATE)
+                path = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_UPDATE)
             except KeyError as e:
-                if server == default_server:
-                    accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = config.settings[config.ATTR_URL_DEFAULT_PATH_UPDATE]
+                if server_url == default_server:
+                    path = config.settings[config.ATTR_URL_DEFAULT_PATH_UPDATE]
                 else:
-                    accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = config.DEFAULT_URL_PATH_UPDATE
+                    path = config.DEFAULT_URL_PATH_UPDATE
+            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = path.lstrip("/")
             #
             try:
                 accdata[self.ATTR_ADDED_ON] = fileaccdata.pop(self.ATTR_ADDED_ON)
@@ -445,13 +458,15 @@ class DomainAccounts:
         accdata[self.ATTR_SUBDOMAIN] = subdomain
         accdata[self.ATTR_USERNAME] = username
         accdata[self.ATTR_PASSWORD] = password
+        if server_url and not server_url.endswith("/"):
+            server_url = "/".join((server_url, ""))
         accdata[self.ATTR_SERVER_URL] = server_url
         #
-        accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = server_path_change
-        accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = server_path_clean
-        accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = server_path_deregister
-        accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = server_path_register
-        accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = server_path_update
+        accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = server_path_change.lstrip("/")
+        accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = server_path_clean.lstrip("/")
+        accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = server_path_deregister.lstrip("/")
+        accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = server_path_register.lstrip("/")
+        accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = server_path_update.lstrip("/")
         #
         accdata[self.ATTR_ADDED_ON] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         accdata[self.ATTR_ADDED_VIA] = "add"
@@ -569,6 +584,11 @@ class DomainAccounts:
         ### convert request data into JSON format; post() json parameter = requests 2.4.2+
         request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
 
+        ### sanitize arguments
+        if server_url and not server_url.endswith("/"):
+            server_url = "/".join((server_url, ""))
+        server_path_register = server_path_register.lstrip("/")
+
         request_url = urllib.parse.urljoin(server_url, server_path_register)
         request_response = requests.post(
             url=request_url,
@@ -601,26 +621,26 @@ class DomainAccounts:
         accdata[self.ATTR_SERVER_URL] = server_url
         #
         try:
-            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_CHANGE)
+            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_CHANGE).lstrip("/")
         except KeyError as e:
-            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = server_path_change
+            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = server_path_change.lstrip("/")
         #
         try:
-            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_CLEAN)
+            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_CLEAN).lstrip("/")
         except KeyError as e:
-            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = server_path_clean
+            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = server_path_clean.lstrip("/")
         #
         try:
-            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_DEREGISTER)
+            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_DEREGISTER).lstrip("/")
         except KeyError as e:
-            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = server_path_deregister
+            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = server_path_deregister.lstrip("/")
         #
         accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = server_path_register
         #
         try:
-            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_UPDATE)
+            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_UPDATE).lstrip("/")
         except KeyError as e:
-            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = server_path_update
+            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = server_path_update.lstrip("/")
         #
         accdata[self.ATTR_ADDED_ON] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         accdata[self.ATTR_ADDED_VIA] = "register"

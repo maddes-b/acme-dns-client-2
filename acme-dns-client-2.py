@@ -20,7 +20,7 @@ Authors:
 """
 
 
-__version__ = "0.10.1"
+__version__ = "0.10.2"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
