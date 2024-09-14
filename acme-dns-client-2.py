@@ -20,7 +20,7 @@ Authors:
 """
 
 
-__version__ = "0.10.2"
+__version__ = "0.10.3"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
@@ -300,6 +300,9 @@ if __name__ == "__main__":
             if not Server:
                 print("Empty/whitespace-only server not allowed. {message:s}".format(message=Server_Message), file=sys.stderr)
             sys.exit(1)
+
+        if not Server.endswith("/"):
+            print("WARNING! Server URL does not end with slash (\\). {message:s}".format(message=Server_Message), file=sys.stderr)
 
         if not (Arguments.change is None or Arguments.change.strip()) \
         or not (Arguments.clean is None or Arguments.clean.strip()) \

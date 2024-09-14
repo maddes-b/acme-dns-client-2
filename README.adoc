@@ -140,14 +140,14 @@ Note: `--server` can be omitted if `default_server` is defined in configuration 
 
 ```
 acme-dns-client-2.sh register \
-  --domain 'test.example.com' --server 'https://acme-dns.example.net'
+  --domain 'test.example.com' --server 'https://acme-dns.example.net/'
 ```
 
 ==== Add an already registered domain
 
 ```
 acme-dns-client-2.sh add \
-  --domain 'test.example.com' --fulldomain 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e5.acme-dns.example.net' --username '<USERNAME>' --password '<PASSWORD>' --server 'https://acme-dns.example.net'
+  --domain 'test.example.com' --fulldomain 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e5.acme-dns.example.net' --username '<USERNAME>' --password '<PASSWORD>' --server 'https://acme-dns.example.net/'
 ```
 
 === Check Domain Setup

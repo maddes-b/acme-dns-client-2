@@ -15,7 +15,7 @@ Authors:
 """
 
 
-__version__ = "0.10.2"
+__version__ = "0.10.3"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
@@ -28,7 +28,6 @@ import collections
 import datetime
 import os
 import typing
-import urllib.parse
 
 ### 3rd-party modules
 ## https://pypi.org/project/dnspython/
@@ -179,11 +178,6 @@ class Configuration:
 
             ### overwrite if known setting
             if key in self.settings:
-                ### special cases
-                if key == self.ATTR_URL_DEFAULT_SERVER:
-                    if fileconfigdata and not fileconfigdata.endswith("/"):
-                        fileconfigdata = "/".join((fileconfigdata, ""))
-
                 self.settings[key] = fileconfigdata
     # --- /Configuration._loadFromFile()
 
@@ -275,8 +269,6 @@ class DomainAccounts:
             accdata[self.ATTR_USERNAME] = fileaccdata.pop(self.ATTR_USERNAME)
             accdata[self.ATTR_PASSWORD] = fileaccdata.pop(self.ATTR_PASSWORD)
             server_url = fileaccdata.pop(self.ATTR_SERVER_URL)
-            if server_url and not server_url.endswith("/"):
-                server_url = "/".join((server_url, ""))
             accdata[self.ATTR_SERVER_URL] = server_url
             #
             try:
@@ -286,7 +278,7 @@ class DomainAccounts:
                     path = config.settings[config.ATTR_URL_DEFAULT_PATH_CHANGE]
                 else:
                     path = config.DEFAULT_URL_PATH_CHANGE
-            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = path.lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = path
             #
             try:
                 path = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_CLEAN)
@@ -295,7 +287,7 @@ class DomainAccounts:
                     path = config.settings[config.ATTR_URL_DEFAULT_PATH_CLEAN]
                 else:
                     path = config.DEFAULT_URL_PATH_CLEAN
-            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = path.lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = path
             #
             try:
                 path = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_DEREGISTER)
@@ -304,7 +296,7 @@ class DomainAccounts:
                     path = config.settings[config.ATTR_URL_DEFAULT_PATH_DEREGISTER]
                 else:
                     path = config.DEFAULT_URL_PATH_DEREGISTER
-            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = path.lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = path
             #
             try:
                 path = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_REGISTER)
@@ -313,7 +305,7 @@ class DomainAccounts:
                     path = config.settings[config.ATTR_URL_DEFAULT_PATH_REGISTER]
                 else:
                     path = config.DEFAULT_URL_PATH_REGISTER
-            accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = path.lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = path
             #
             try:
                 path = fileaccdata.pop(self.ATTR_SERVER_URL_PATH_UPDATE)
@@ -322,7 +314,7 @@ class DomainAccounts:
                     path = config.settings[config.ATTR_URL_DEFAULT_PATH_UPDATE]
                 else:
                     path = config.DEFAULT_URL_PATH_UPDATE
-            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = path.lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = path
             #
             try:
                 accdata[self.ATTR_ADDED_ON] = fileaccdata.pop(self.ATTR_ADDED_ON)
@@ -458,15 +450,13 @@ class DomainAccounts:
         accdata[self.ATTR_SUBDOMAIN] = subdomain
         accdata[self.ATTR_USERNAME] = username
         accdata[self.ATTR_PASSWORD] = password
-        if server_url and not server_url.endswith("/"):
-            server_url = "/".join((server_url, ""))
         accdata[self.ATTR_SERVER_URL] = server_url
         #
-        accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = server_path_change.lstrip("/")
-        accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = server_path_clean.lstrip("/")
-        accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = server_path_deregister.lstrip("/")
-        accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = server_path_register.lstrip("/")
-        accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = server_path_update.lstrip("/")
+        accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = server_path_change
+        accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = server_path_clean
+        accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = server_path_deregister
+        accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = server_path_register
+        accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = server_path_update
         #
         accdata[self.ATTR_ADDED_ON] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         accdata[self.ATTR_ADDED_VIA] = "add"
@@ -584,12 +574,7 @@ class DomainAccounts:
         ### convert request data into JSON format; post() json parameter = requests 2.4.2+
         request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
 
-        ### sanitize arguments
-        if server_url and not server_url.endswith("/"):
-            server_url = "/".join((server_url, ""))
-        server_path_register = server_path_register.lstrip("/")
-
-        request_url = urllib.parse.urljoin(server_url, server_path_register)
+        request_url = "".join((server_url, server_path_register))
         request_response = requests.post(
             url=request_url,
             headers=request_headers,
@@ -621,26 +606,26 @@ class DomainAccounts:
         accdata[self.ATTR_SERVER_URL] = server_url
         #
         try:
-            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_CHANGE).lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_CHANGE)
         except KeyError as e:
-            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = server_path_change.lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_CHANGE] = server_path_change
         #
         try:
-            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_CLEAN).lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_CLEAN)
         except KeyError as e:
-            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = server_path_clean.lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_CLEAN] = server_path_clean
         #
         try:
-            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_DEREGISTER).lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_DEREGISTER)
         except KeyError as e:
-            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = server_path_deregister.lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_DEREGISTER] = server_path_deregister
         #
         accdata[self.ATTR_SERVER_URL_PATH_REGISTER] = server_path_register
         #
         try:
-            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_UPDATE).lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = apiaccdata.pop(self.ATTR_SERVER_URL_PATH_UPDATE)
         except KeyError as e:
-            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = server_path_update.lstrip("/")
+            accdata[self.ATTR_SERVER_URL_PATH_UPDATE] = server_path_update
         #
         accdata[self.ATTR_ADDED_ON] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         accdata[self.ATTR_ADDED_VIA] = "register"
@@ -674,7 +659,7 @@ class DomainAccounts:
         ### convert request data into JSON format; post() json parameter = requests 2.4.2+
         request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
 
-        request_url = urllib.parse.urljoin(accdata[cls.ATTR_SERVER_URL], accdata[cls.ATTR_SERVER_URL_PATH_UPDATE])
+        request_url = "".join((accdata[cls.ATTR_SERVER_URL], accdata[cls.ATTR_SERVER_URL_PATH_UPDATE]))
         request_response = requests.post(
             url=request_url,
             headers=request_headers,
@@ -715,7 +700,7 @@ class DomainAccounts:
         ### convert request data into JSON format; post() json parameter = requests 2.4.2+
         request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
 
-        request_url = urllib.parse.urljoin(accdata[cls.ATTR_SERVER_URL], accdata[cls.ATTR_SERVER_URL_PATH_DEREGISTER])
+        request_url = "".join((accdata[cls.ATTR_SERVER_URL], accdata[cls.ATTR_SERVER_URL_PATH_DEREGISTER]))
         request_response = requests.post(
             url=request_url,
             headers=request_headers,
@@ -757,7 +742,7 @@ class DomainAccounts:
         ### convert request data into JSON format; post() json parameter = requests 2.4.2+
         request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
 
-        request_url = urllib.parse.urljoin(accdata[cls.ATTR_SERVER_URL], accdata[cls.ATTR_SERVER_URL_PATH_CLEAN])
+        request_url = "".join((accdata[cls.ATTR_SERVER_URL], accdata[cls.ATTR_SERVER_URL_PATH_CLEAN]))
         request_response = requests.post(
             url=request_url,
             headers=request_headers,
@@ -813,7 +798,7 @@ class DomainAccounts:
         ### convert request data into JSON format; post() json parameter = requests 2.4.2+
         request_data = json.dumps(request_data, **JSON5_DUMP_KWARGS)
 
-        request_url = urllib.parse.urljoin(accdata[self.ATTR_SERVER_URL], accdata[self.ATTR_SERVER_URL_PATH_CHANGE])
+        request_url = "".join((accdata[self.ATTR_SERVER_URL], accdata[self.ATTR_SERVER_URL_PATH_CHANGE]))
         request_response = requests.post(
             url=request_url,
             headers=request_headers,
