@@ -15,7 +15,7 @@ Authors:
 """
 
 
-__version__ = "0.10.3"
+__version__ = "0.10.4"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
@@ -165,7 +165,7 @@ class Configuration:
         self._resetWithDefaults()
 
         filedata = None
-        with open(self._jsonpath, mode="rt") as file:
+        with open(self._jsonpath, mode="rt", encoding="UTF-8", newline=None) as file:
             filedata = json.load(file)
 
         for key, fileconfigdata in filedata.items():
@@ -257,7 +257,7 @@ class DomainAccounts:
         self.domains.clear()
 
         filedata = None
-        with open(self._jsonpath, mode="rt") as file:
+        with open(self._jsonpath, mode="rt", encoding="UTF-8", newline=None) as file:
             filedata = json.load(file)
 
         default_server = config.settings[config.ATTR_URL_DEFAULT_SERVER]
@@ -397,7 +397,7 @@ class DomainAccounts:
         filedata = json.dumps(filedata, indent=4, **JSON5_DUMP_KWARGS)
 
         ### write JSON string
-        with open(self._jsonpath, mode="wt") as file:
+        with open(self._jsonpath, mode="wt", encoding="UTF-8", newline="\n") as file:
             file.write(filedata)
     # --- /DomainAccounts.save()
 
@@ -866,7 +866,7 @@ class DomainAccounts:
             ### https://dnspython.readthedocs.io/en/stable/resolver-class.html#dns.resolver.Resolver.resolve
             dns_answers = resolve_func(qname=accdata[cls.ATTR_DOMAIN_CHALLENGE], rdtype=dns.rdatatype.TXT)
         except dns.exception.DNSException as e:
-            return False, "TXT missing (acme-dns: either DNS (NS, A/AAAA or glue record) or setup (domain not updated once yet? deregistered?)"
+            return False, "TXT missing (acme-dns: either DNS issue (NS, A/AAAA or glue record) or no token record (domain not updated once yet? deregistered?))"
 
         return True, "TXT available (acme-dns)"
     # --- /DomainAccounts._check_txt()

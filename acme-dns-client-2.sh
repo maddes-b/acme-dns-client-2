@@ -43,7 +43,7 @@ if [ ! -d "${VENV_PATH}" ]; then
   printf -- '%s\n' "--- Initializing Python Virtual Environment at ${VENV_PATH}" 1>&2
   RC=0 ; "python${PYTHON_VERSION}" -m venv "${VENV_PATH}" || RC="${?}"
   if [ "${RC}" -ne 0 ]; then
-    printf -- '%s\n' "Failed to setup virtual environment in ${VENV_PATH}." 1>&2
+    printf -- '%s\n' "Failed to set virtual environment up in ${VENV_PATH}." 1>&2
     return "${RC}" 2>/dev/null || exit "${RC}"
   fi
 fi
@@ -84,4 +84,4 @@ unset -v PYTHON_VERSION RC SCRIPT_NAME SCRIPT_DIR SCRIPT_PY_NAME VENV_PATH
 
 unset -v CREATE
 
-SCRIPT_PATH="${0}" "${SCRIPT_PY_PATH}" "${@}"
+ADC2_PATH="${0}" "${SCRIPT_PY_PATH}" "${@}"
