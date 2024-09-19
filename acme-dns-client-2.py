@@ -20,7 +20,7 @@ Authors:
 """
 
 
-__version__ = "0.10.3"
+__version__ = "0.10.4"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
@@ -36,7 +36,7 @@ import sys
 
 ### fix script name for argparse output
 try:
-    sys.argv[0] = os.environ["SCRIPT_PATH"]
+    sys.argv[0] = os.environ["ADC2_PATH"]
 except KeyError as e:
     pass
 ### allow local imports from script directory
@@ -101,8 +101,8 @@ def createArgParser() -> argparse.ArgumentParser:
 Client for acme-dns servers. Client can be used with certbot and acme.sh.".format(version=__version__, version2=acmednsclient2.__version__, copyright=__copyright__, homepage=__homepage__)
     epilog = "\
 First register the domain on the acme-dns server via the `register` command. \
-Existing registrations can also be imported into the config via the `add` command.\n\
-Then setup the DNS records and verify the setup with the `check` command.\n\
+Existing registrations can also be imported via the `add` command.\n\
+Then set the DNS records up and verify the setup with the `check` command.\n\
 Finally use this script as a certbot plugin via `--manual --preferred-challenges dns --manual-auth-hook '/path/to/{script:s} certbot'` to retrieve a certificate with certbot's `certonly` command.\n\
 For acme.sh copy the wrapper script 'dns_acmednsclient2.sh' to '/path/to/acme.sh/dnsapi/' and use it via `--dns dns_acmednsclient2`.".format(script=os.path.basename(sys.argv[0]).replace(".py", ".sh"))
 
