@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: nil; py-indent-offset: 4 -*-
-### shebang `/usr/bin/env python3` due to Python Virtual Environment
+### shebang `/usr/bin/env python` due to Python Virtual Environment
 
 """
 acme-dns-client-2 for acme-dns servers - normally executed via related .sh file (due to Virtual Enviroment with required modules)
@@ -20,7 +20,7 @@ Authors:
 """
 
 
-__version__ = "0.10.4"
+__version__ = "0.10.5"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"
@@ -215,7 +215,7 @@ if __name__ == "__main__":
         sys.exit(1)
     if Arguments.accounts is not None \
     and not (Arguments.accounts and Arguments.accounts.strip()):
-        print("Empty/whitespace-only accounts file specified. Specified via --accounts", file=sys.stderr)
+        print("Empty/whitespace-only domain accounts file specified. Specified via --accounts", file=sys.stderr)
         sys.exit(1)
     #
     Config = acmednsclient2.Configuration(configpath=Arguments.config, accountspath=Arguments.accounts)

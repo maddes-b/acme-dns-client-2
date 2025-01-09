@@ -3,6 +3,7 @@
 *.code-workspace
 .venv*/
 *.venv*/
+.test*/
 
 ## from GitHub: Python ignore
 # Byte-compiled / optimized / DLL files

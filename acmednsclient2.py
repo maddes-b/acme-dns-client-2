@@ -15,7 +15,7 @@ Authors:
 """
 
 
-__version__ = "0.10.4"
+__version__ = "0.10.5"
 __author__ = "Matthias \"Maddes\" Bücher"
 __license__ = "GPLv2"
 __copyright__ = "Copyright (C) 2024 Matthias \"Maddes\" Bücher"

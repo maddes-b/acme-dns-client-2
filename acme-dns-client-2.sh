@@ -26,12 +26,20 @@ SCRIPT_DIR="$(dirname "${0}")"
 SCRIPT_PY_NAME="${SCRIPT_NAME%.sh}.py"
 SCRIPT_PY_PATH="${SCRIPT_DIR}/${SCRIPT_PY_NAME}"
 
+### Determine python executable (Special case Windows)
+unset -v PYTHON_EXE
+if [ -n "${WINDIR:-}" ]; then
+  PYTHON_EXE="py -${PYTHON_VERSION}"
+else
+  PYTHON_EXE="python${PYTHON_VERSION}"
+fi
+
 umask 0022
 
 ### Check for python module venv
-RC=0 ; { "python${PYTHON_VERSION}" -m venv -h >/dev/null ; } || RC="${?}"
+RC=0 ; { ${PYTHON_EXE} -m venv -h >/dev/null ; } || RC="${?}"
 if [ "${RC}" -ne 0 ]; then
-  printf -- '%s\n' 'Python support for Virtual Environments via "venv" missing. Please install via package manager.' 1>&2
+  printf -- 'ERROR: %s\n' 'Python support for Virtual Environments via "venv" missing. Please install via package manager.' 1>&2
   return "${RC}" 2>/dev/null || exit "${RC}"
 fi
 
@@ -41,26 +49,36 @@ CREATE=''
 if [ ! -d "${VENV_PATH}" ]; then
   CREATE='X'
   printf -- '%s\n' "--- Initializing Python Virtual Environment at ${VENV_PATH}" 1>&2
-  RC=0 ; "python${PYTHON_VERSION}" -m venv "${VENV_PATH}" || RC="${?}"
+  RC=0 ; ${PYTHON_EXE} -m venv "${VENV_PATH}" || RC="${?}"
   if [ "${RC}" -ne 0 ]; then
-    printf -- '%s\n' "Failed to set virtual environment up in ${VENV_PATH}." 1>&2
+    printf -- 'ERROR: %s\n' "Failed to set virtual environment up in ${VENV_PATH}." 1>&2
     return "${RC}" 2>/dev/null || exit "${RC}"
   fi
 fi
 
 ### Activate virtual environment
 set +u ; ### workaround for older venv versions
-. "${VENV_PATH}/bin/activate"
+if [ -s "${VENV_PATH}/bin/activate" ]; then
+  . "${VENV_PATH}/bin/activate"
+elif [ -s "${VENV_PATH}/Scripts/activate" ]; then
+  . "${VENV_PATH}/Scripts/activate"
+else
+  printf -- 'ERROR: %s\n' "Unknown type of virtual environment in ${VENV_PATH}" 1>&2
+  return 1 2>/dev/null || exit 1
+fi
 set -u
 
-unset -v PYTHON_VERSION RC SCRIPT_NAME SCRIPT_DIR SCRIPT_PY_NAME VENV_PATH
+unset -v PYTHON_EXE PYTHON_VERSION RC SCRIPT_NAME SCRIPT_DIR SCRIPT_PY_NAME VENV_PATH
 
 ### Check for additional python packages in virtual environment
 ( ### sub-shell to protect original positional arguments
   DONT_CHECK='' ### SPEEDUP: disable with 'X' after virtual environment was created successfully the first time
+  if [ -n "${CREATE}" ]; then
+    python -m pip install --upgrade pip
+  fi
   if [ -z "${DONT_CHECK}" -o -n "${CREATE}" ];  then
-    PYTHON_MODULES='dnspython json5 requests'
-    PYTHON_MODULES_VERSION='>=1.6 any >=2.0'
+    PYTHON_MODULES='dnspython json5 requests python-config'
+    PYTHON_MODULES_VERSION='>=1.6 any >=2.0 any'
     set -- ${PYTHON_MODULES_VERSION}
     for PYTHON_MODULE in ${PYTHON_MODULES}
      do
@@ -73,7 +91,7 @@ unset -v PYTHON_VERSION RC SCRIPT_NAME SCRIPT_DIR SCRIPT_PY_NAME VENV_PATH
         printf -- '%s\n' "--- Installing Python module ${PYTHON_MODULE}${PYTHON_MODULE_VERSION:+ ${PYTHON_MODULE_VERSION}}" 1>&2
         RC=0 ; { python -m pip install "${PYTHON_MODULE}${PYTHON_MODULE_VERSION}" 1>&2 ; } || RC="${?}"
         if [ "${RC}" -ne 0 ]; then
-          printf -- '%s\n' 'Failed.' 1>&2
+          printf -- 'ERROR: %s\n' 'Failed.' 1>&2
           return "${RC}" 2>/dev/null || exit "${RC}"
         fi
       fi

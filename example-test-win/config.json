@@ -1,0 +1,4 @@
+{
+    // run from path of script with `--config ./example-test-win/config.json`
+    "accountspath": "./example-test-win/domain_accounts.json"
+}

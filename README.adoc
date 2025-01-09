@@ -4,20 +4,22 @@
 :url-maddes: https://www.maddes.net/
 :toc:
 
+Project page: {url-project}
 
 == Features
 
-* Manage https://github.com/joohoi/acme-dns[acme-dns] (https://github.com/acme-dns/acme-dns[alternative]) domain registrations and TXT record updates with ease.
-* Supports ACME clients https://certbot.eff.org/[certbot] (Let's Encrypt only) and https://github.com/acmesh-official/acme.sh[acme.sh]. Maybe also other ACME clients.
-* All details of the domain registrations are kept in a domain accounts file to reduce command line parameters and to support multiple acme-dns server instances.
+* Manage https://github.com/joohoi/acme-dns[acme-dns] (https://github.com/acme-dns/acme-dns[alternative link]) domain registrations and related TXT record updates with ease.
+* Supports ACME clients https://certbot.eff.org/[certbot] (Let's Encrypt only) and https://github.com/acmesh-official/acme.sh[acme.sh].
+** May work with other ACME clients too. Otherwise create a feature request on the {url-project}[project page].
+* All details of the domain registrations are kept in a domain accounts file to reduce command line parameters and to support multi-domain certificates with multiple acme-dns server servers.
 ** Add existing domain registrations.
 ** Supports custom API paths, e.g. for reverse proxied API.
 ** Rename domains to re-use domain registrations.
 * One setup for all: command line, certbot, acme.sh, etc.
 ** Allows switching between ACME clients without reconfiguration.
-** JSON in human-readable format for manual maintenance (not recommended for domain accounts file).
 * Supports multiple configuration setups if needed.
-* Provides check for DNS and acme-dns working.
+** Configuration JSON in JSON5 human-readable format for manual maintenance (not recommended for domain accounts file).
+* Provides check for DNS setup and that acme-dns server is working.
 * Provides dummy token to test token update.
 * Scripts only: Python 3.5+ with wrapper shell script (POSIX compatible) for handling Python Virtual Environment.
 ////
@@ -30,13 +32,20 @@
 
 == Installation
 
-Project page: {url-project}
-
 === Prerequisites
 
 Install Python 3 (3.5+) and Virtual Environment support via venv.
 
-Debian/Ubuntu: `apt install python3 python3-venv`
+Debian/Ubuntu:
+
+* `apt install python3 python3-venv`
+
+Windows is not supported for productive use, but can work under certain conditions:
+
+* Normal Python installation via https://www.python.org/downloads/windows/[installer].
+* MSYS/MinGW/Cygwin for bash, e.g. https://git-scm.com/downloads/win[git for Windows] (git bash).
+* Pathes of config file and domain accounts file have to be defined with forward slash `/` instead of backslash `\`.
+  Best is to use a relative path, see directory `example-test-win`.
 
 === acme-dns-client-2
 
@@ -93,46 +102,51 @@ commands:
 
 The configuration file defaults to `/etc/acme-dns-client/config.json`.
 An alternative config file can be defined via `--config`.
+If the file is missing, then the program aborts to avoid running with a wrong configuration. +
+
 Maintain config file manually to define other values.
 
 See the current configuration in JSON syntax via `acme-dns-client-2.sh config`.
-If the config file is missing/empty, then the defaults are shown.
+If a configuration entry or the config file is empty, then the defaults are shown.
 
 The following can be configured in JSON syntax:
 
 * `default_server` (string) - defines a default server to use for `add/register` command. +
 Useful if mainly a single acme-dns server is used.
-Still another acme-dns server can be specified via `--server`.
-** `default_server_path_change` (string) - custom URL path to change a domain account, defaults to `change`.
-** `default_server_path_clean` (string) - custom URL path to clean a TXT/token record, defaults to `clean`.
-** `default_server_path_deregister` (string) - custom URL path to deregister a domain account, defaults to `deregister`.
+Still other acme-dns servers can be used via `--server`.
 ** `default_server_path_register` (string) - custom URL path to register a new domain account, defaults to `register`.
 ** `default_server_path_update` (string) - custom URL path to update TXT/token for a challenge, defaults to `update`.
-* `nameservers` (list of strings) - define different name servers to do DNS lookups via their IPs.
-* `accountspath` (string) - defines a different domain accounts file. Professional use only.
+** `default_server_path_change` (string) - custom URL path to change a domain account (acme-dns server must support this), defaults to `change`.
+** `default_server_path_clean` (string) - custom URL path to clean a TXT/token record (acme-dns server must support this), defaults to `clean`.
+** `default_server_path_deregister` (string) - custom URL path to deregister a domain account (acme-dns server must support this), defaults to `deregister`.
+* `nameservers` (list of strings) - defines name server IPs for DNS lookups, defaults to Cloudflare and Quad9.
+* `accountspath` (string) - defines path to domain accounts file. Professional use only.
 
 === Domain Accounts File
 
 The domain accounts file defaults to `/etc/acme-dns-client/domain_accounts.json`.
-An alternative domain accounts file can be defined via `--accounts` or via config file. +
+An alternative domain accounts file can be defined via `--accounts` or via config file.
+If the file is missing, then the program aborts to avoid running with a wrong setup.
+
 It holds all details of the registered domains in JSON syntax. +
 *DO NOT* maintain it manually.
 
-* Use command `acme-dns-client-2.sh list` to get all registered domain names.
-* Use command `acme-dns-client-2.sh show --domain <domain>` to show details for a domain.
+* Use command `acme-dns-client-2.sh list` to list all registered domains.
+* Use command `acme-dns-client-2.sh show --domain <domain>` to show details of a domain.
 
 === Register/Add Domain
 
-Register/Add each domain separately. +
+Register/Add each domain separately.
+
 If a domain was already registered earlier and the related data is available, then use `add`.
 The password must be known as it cannot be determined from anything else.
 The fulldomain can be determined from the DNS CNAME record of the related challenge domain.
 The subdomain is part of the fulldomain.
 The username can be de determined from the acme-dns database record for the subdomain. +
 Otherwise `register` anew.
-Warning! This will lead to a new DNS setup, that will break other setups.
+Warning! This will lead to a new DNS setup, that may break other setups.
 
-A single registration is needed for normal and wildcard certificate entries of a domain, e.g. `test.example.com` is also valid for `*.test.example.com`.
+A single registration is needed for normal and wildcard certificate entries of a domain, e.g. registration of `test.example.com` is also valid for `*.test.example.com`.
 
 Note: `--server` can be omitted if `default_server` is defined in configuration and shall be used for the domain registration.
 
@@ -221,14 +235,14 @@ If performance is highly important for whatever reason, then check out the SPEED
 Normally performance should not matter for retrieving and renewing certificates.
 
 === Bugs, Pull Requests, Ideas
-If there any issues or ideas, then just create an issue on the project page.
+If there are any issues or ideas, then just create an issue on the {url-project}[project page].
 
 
 == Development & Testing
 
 === Execution
-`acme-dns-client-2.py` can be run directly but the required modules must be available either from the system or an activated Python Virtual Environment.
-That allows to debug the Python script within an IDE, e.g. VS Code in WSL.
+`acme-dns-client-2.py` can be run directly, but the required modules must be available either from the system or an active Python Virtual Environment.
+Directly running it allows to debug the Python script within an IDE, e.g. VS Code in WSL.
 
 === certbot Testing
 
@@ -259,3 +273,4 @@ Do not post any output/log where this option was enabled.
 ** Similar domain accounts file `/etc/letsencrypt/acmedns.json`, which can be directly used with acme-dns-client-2 (either copy or use `--accounts`).
 * https://github.com/acmesh-official/acme.sh/blob/master/dnsapi/dns_acmedns.sh[dns_acmedns.sh] (https://github.com/dampfklon/acme.sh[alternative]) (acme.sh shell script)
 ** only works for certificates with a single domain (normal and/or wildcard).
+** fails for multi-domain certificates (as of 2024-05).
