@@ -39,12 +39,12 @@ import json5 as json ### SPEEDUP: switch to standard 'json' module, but then avo
 ## https://pypi.org/project/requests/
 import requests
 
-### Check for json5 otherwise fallback to json arguments
+### Check for json5.dumps() otherwise fallback to json.dumps() arguments
 JSON5_DUMP_KWARGS = {"quote_keys": True, "trailing_commas": False}
 JSON5_TEST = {"Test1": "1", "Test2": 2}
 try:
     RESULT = json.dumps(JSON5_TEST, indent=4, **JSON5_DUMP_KWARGS)
-except TypeError as e: ### fallback to  for json.dump()
+except TypeError as e: ### fallback: no extra arguments for json.dumps()
     JSON5_DUMP_KWARGS = {}
     RESULT = json.dumps(JSON5_TEST, indent=4, **JSON5_DUMP_KWARGS)
 del JSON5_TEST, RESULT
