@@ -11,14 +11,14 @@ Project page: {url-project}
 * Manage https://github.com/joohoi/acme-dns[acme-dns] (https://github.com/acme-dns/acme-dns[alternative link]) domain registrations and related TXT record updates with ease.
 * Supports ACME clients https://certbot.eff.org/[certbot] (Let's Encrypt only) and https://github.com/acmesh-official/acme.sh[acme.sh].
 ** May work with other ACME clients too. Otherwise create a feature request on the {url-project}[project page].
-* All details of the domain registrations are kept in a domain accounts file to reduce command line parameters and to support multi-domain certificates with multiple acme-dns server servers.
+* All details of the domain registrations are kept in a domain accounts file to reduce command line parameters and to support multi-domain certificates even with multiple acme-dns servers.
 ** Add existing domain registrations.
 ** Supports custom API paths, e.g. for reverse proxied API.
 ** Rename domains to re-use domain registrations.
 * One setup for all: command line, certbot, acme.sh, etc.
 ** Allows switching between ACME clients without reconfiguration.
 * Supports multiple configuration setups if needed.
-** Configuration JSON in JSON5 human-readable format for manual maintenance (not recommended for domain accounts file).
+** Configuration file is in JSON5 human-readable format for manual maintenance (not recommended for domain accounts file).
 * Provides check for DNS setup and that acme-dns server is working.
 * Provides dummy token to test token update.
 * Scripts only: Python 3.5+ with wrapper shell script (POSIX compatible) for handling Python Virtual Environment.
@@ -47,13 +47,15 @@ Windows is not supported for productive use, but can work under certain conditio
 * Pathes of config file and domain accounts file have to be defined with forward slash `/` instead of backslash `\`.
   Best is to use a relative path, see directory `example-test-win`.
 
+Windows Subsystem for Linux (WSL) is recommended for development and testing.
+
 === acme-dns-client-2
 
 Download {url-project}[acme-dns-client-2] and extract it to a temporary directory.
 Or directly `git clone` it to a temporary directory. +
 Make `install.sh` executable.
 Run it to install acme-dns-client-2 to `${PREFIX}/usr/local/bin`. `${PREFIX}` is useful for package maintainers of Linux distros. +
-It will also create an initial configuration file and initial domain accounts file in `${PREFIX}/etc/acme-dns-client`.
+It will also create an initial configuration file and/or initial domain accounts file in `${PREFIX}/etc/acme-dns-client`, if any of them is missing.
 ```
 chmod u+x install.sh
 PREFIX='' ./install.sh
@@ -69,7 +71,7 @@ Copy `dns_acmednsclient2.sh` to `/path/to/acme.sh/dnsapi/`.
 
 Always execute `acme-dns-client-2.sh`.
 It is a wrapper shell script to create and activate the required Python Virtual Environment. +
-When executed without any arguments it will display the main help with the possible commands.
+When executed without any argument it will display the main help with the possible commands.
 
 === Commands List
 
@@ -142,7 +144,7 @@ If a domain was already registered earlier and the related data is available, th
 The password must be known as it cannot be determined from anything else.
 The fulldomain can be determined from the DNS CNAME record of the related challenge domain.
 The subdomain is part of the fulldomain.
-The username can be de determined from the acme-dns database record for the subdomain. +
+The username can be determined from the acme-dns database record for the subdomain. +
 Otherwise `register` anew.
 Warning! This will lead to a new DNS setup, that may break other setups.
 
